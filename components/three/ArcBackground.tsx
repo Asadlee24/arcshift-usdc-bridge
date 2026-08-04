@@ -1,5 +1,5 @@
 // components/three/ArcBackground.tsx
-// 3D React Three Fiber centerpiece sphere background (Supports Dark/Light Themes dynamically)
+// High-performance 3D React Three Fiber background with interactive 3D spheres, glowing orbital rings, dynamic particle field, and mouse parallax
 
 'use client';
 
@@ -13,126 +13,196 @@ interface ArcBackgroundProps {
   theme?: 'dark' | 'light';
 }
 
-// ELEMENT 1: Floating Particle Field (Smooth slow floating motion)
-function FloatingParticles({ isWalletConnected = false, isBridging = false }: { isWalletConnected?: boolean; isBridging?: boolean }) {
+// 1. DYNAMIC FLOATING STAR/PARTICLE FIELD
+function FloatingParticles({ isBridging = false, theme = 'dark' }: { isBridging?: boolean; theme?: 'dark' | 'light' }) {
   const pointsRef = useRef<THREE.Points>(null);
+  const count = 1800;
 
-  const count = 1200;
   const positions = useMemo(() => {
     const pos = new Float32Array(count * 3);
     for (let i = 0; i < count; i++) {
-      pos[i * 3] = (Math.random() - 0.5) * 60;     // X
-      pos[i * 3 + 1] = (Math.random() - 0.5) * 60; // Y
-      pos[i * 3 + 2] = (Math.random() - 0.5) * 60; // Z
+      pos[i * 3] = (Math.random() - 0.5) * 70;
+      pos[i * 3 + 1] = (Math.random() - 0.5) * 70;
+      pos[i * 3 + 2] = (Math.random() - 0.5) * 70;
     }
     return pos;
-  }, []);
+  }, [count]);
 
   const colors = useMemo(() => {
     const cols = new Float32Array(count * 3);
-    const colorEmerald = new THREE.Color('#10B981');
-    const colorBlue = new THREE.Color('#3B82F6');
+    const emerald = new THREE.Color('#10B981');
+    const cyan = new THREE.Color('#06B6D4');
+    const purple = new THREE.Color('#8B5CF6');
 
     for (let i = 0; i < count; i++) {
-      const mixedColor = new THREE.Color().lerpColors(colorEmerald, colorBlue, Math.random());
-      cols[i * 3] = mixedColor.r;
-      cols[i * 3 + 1] = mixedColor.g;
-      cols[i * 3 + 2] = mixedColor.b;
+      const rand = Math.random();
+      let color: THREE.Color;
+      if (rand < 0.5) {
+        color = new THREE.Color().lerpColors(emerald, cyan, rand * 2);
+      } else {
+        color = new THREE.Color().lerpColors(cyan, purple, (rand - 0.5) * 2);
+      }
+      cols[i * 3] = color.r;
+      cols[i * 3 + 1] = color.g;
+      cols[i * 3 + 2] = color.b;
     }
     return cols;
-  }, []);
+  }, [count]);
 
-  useFrame(() => {
+  useFrame((state) => {
     if (!pointsRef.current) return;
 
-    // Elegant rotation speed based on isBridging state (Warp space effect)
-    const rotSpeedY = isBridging ? 0.008 : 0.0003;
-    const rotSpeedX = isBridging ? 0.004 : 0.00015;
-    pointsRef.current.rotation.y += rotSpeedY;
-    pointsRef.current.rotation.x += rotSpeedX;
+    const speedMult = isBridging ? 3.5 : 1.0;
+    pointsRef.current.rotation.y += 0.0004 * speedMult;
+    pointsRef.current.rotation.x += 0.0002 * speedMult;
 
-    // Smooth drift upward speed based on isBridging state
-    const driftSpeed = isBridging ? 0.09 : 0.006;
-    const positionAttribute = pointsRef.current.geometry.getAttribute('position') as THREE.BufferAttribute;
-    if (positionAttribute) {
-      for (let i = 0; i < positionAttribute.count; i++) {
-        let y = positionAttribute.getY(i);
-        y += driftSpeed; // Smooth visible float
-        if (y > 30) y = -30;
-        positionAttribute.setY(i, y);
+    const positionAttr = pointsRef.current.geometry.getAttribute('position') as THREE.BufferAttribute;
+    if (positionAttr) {
+      const drift = (isBridging ? 0.08 : 0.012) * speedMult;
+      for (let i = 0; i < positionAttr.count; i++) {
+        let y = positionAttr.getY(i);
+        y += drift;
+        if (y > 35) y = -35;
+        positionAttr.setY(i, y);
       }
-      positionAttribute.needsUpdate = true;
+      positionAttr.needsUpdate = true;
     }
   });
+
+  const particleOpacity = theme === 'dark' ? 0.45 : 0.25;
 
   return (
     <points ref={pointsRef}>
       <bufferGeometry>
-        <bufferAttribute
-          attach="attributes-position"
-          args={[positions, 3]}
-        />
-        <bufferAttribute
-          attach="attributes-color"
-          args={[colors, 3]}
-        />
+        <bufferAttribute attach="attributes-position" args={[positions, 3]} />
+        <bufferAttribute attach="attributes-color" args={[colors, 3]} />
       </bufferGeometry>
       <pointsMaterial
-        size={0.09}
+        size={theme === 'dark' ? 0.12 : 0.09}
         vertexColors
         transparent
-        opacity={0.2}
-        sizeAttenuation={true}
+        opacity={particleOpacity}
+        sizeAttenuation
         depthWrite={false}
+        blending={THREE.AdditiveBlending}
       />
     </points>
   );
 }
 
-// ELEMENT 2: Centerpiece wireframe sphere
-function ArcSphere({ isBridging = false }: { isBridging?: boolean }) {
-  const sphereRef = useRef<THREE.Mesh>(null);
-  const ringRef = useRef<THREE.Mesh>(null);
+// 2. DUAL 3D GEODESIC SPHERES & ORBITAL RINGS
+function ArcSphere3D({ isBridging = false, theme = 'dark' }: { isBridging?: boolean; theme?: 'dark' | 'light' }) {
+  const outerSphereRef = useRef<THREE.Mesh>(null);
+  const innerSphereRef = useRef<THREE.Mesh>(null);
+  const ringRef1 = useRef<THREE.Mesh>(null);
+  const ringRef2 = useRef<THREE.Mesh>(null);
+  const ringRef3 = useRef<THREE.Mesh>(null);
 
   useFrame((state) => {
-    if (sphereRef.current) {
-      const rotSpeed = isBridging ? 0.015 : 0.0005;
-      sphereRef.current.rotation.y += rotSpeed;
-      sphereRef.current.rotation.x += rotSpeed / 2;
-      
-      // Professional, slow gentle breathing/pulsing animation (accelerates during bridging)
-      const pulseSpeed = isBridging ? 2.5 : 0.5;
-      const pulseAmp = isBridging ? 0.15 : 0.04;
-      const breathingScale = 1.0 + Math.sin(state.clock.getElapsedTime() * pulseSpeed) * pulseAmp;
-      sphereRef.current.scale.set(breathingScale, breathingScale, breathingScale);
+    const t = state.clock.getElapsedTime();
+    const speed = isBridging ? 2.5 : 1.0;
+
+    if (outerSphereRef.current) {
+      outerSphereRef.current.rotation.y = t * 0.08 * speed;
+      outerSphereRef.current.rotation.x = t * 0.04 * speed;
+      const pulse = 1.0 + Math.sin(t * 0.8 * speed) * 0.05;
+      outerSphereRef.current.scale.set(pulse, pulse, pulse);
     }
-    if (ringRef.current) {
-      const ringRot = isBridging ? 0.01 : 0.0003;
-      ringRef.current.rotation.z -= ringRot;
+
+    if (innerSphereRef.current) {
+      innerSphereRef.current.rotation.y = -t * 0.12 * speed;
+      innerSphereRef.current.rotation.z = t * 0.06 * speed;
+      const pulseInner = 1.0 + Math.cos(t * 1.2 * speed) * 0.08;
+      innerSphereRef.current.scale.set(pulseInner, pulseInner, pulseInner);
+    }
+
+    if (ringRef1.current) {
+      ringRef1.current.rotation.z = t * 0.15 * speed;
+      ringRef1.current.rotation.x = Math.sin(t * 0.3) * 0.2;
+    }
+    if (ringRef2.current) {
+      ringRef2.current.rotation.z = -t * 0.2 * speed;
+      ringRef2.current.rotation.y = Math.cos(t * 0.3) * 0.25;
+    }
+    if (ringRef3.current) {
+      ringRef3.current.rotation.x = t * 0.18 * speed;
+      ringRef3.current.rotation.z = Math.sin(t * 0.4) * 0.3;
     }
   });
 
+  const isDark = theme === 'dark';
+  const wireColor = isDark ? '#10B981' : '#059669';
+  const coreColor = isDark ? '#06B6D4' : '#0284C7';
+  const opacityOuter = isDark ? 0.22 : 0.12;
+  const opacityInner = isDark ? 0.35 : 0.18;
+
   return (
-    <group position={[0, 0, -6]}>
-      {/* 3D Wireframe sphere centerpiece — 10% opacity for a sharp, premium professional feel */}
-      <mesh ref={sphereRef}>
-        <sphereGeometry args={[2.8, 24, 24]} />
-        <meshBasicMaterial
-          color="#10B981"
+    <group position={[0, 0, -5]}>
+      {/* Outer Geodesic Sphere */}
+      <mesh ref={outerSphereRef}>
+        <icosahedronGeometry args={[3.2, 3]} />
+        <meshStandardMaterial
+          color={wireColor}
           wireframe
           transparent
-          opacity={0.1}
+          opacity={opacityOuter}
+          roughness={0.2}
+          metalness={0.8}
+          emissive={wireColor}
+          emissiveIntensity={isDark ? 0.4 : 0.1}
           depthWrite={false}
         />
       </mesh>
 
-      {/* Equatorial torus ring */}
-      <mesh ref={ringRef} rotation={[Math.PI / 2.2, 0, 0]}>
-        <torusGeometry args={[3.2, 0.02, 16, 100]} />
-        <meshBasicMaterial
+      {/* Inner Glowing Core Mesh */}
+      <mesh ref={innerSphereRef}>
+        <octahedronGeometry args={[1.9, 2]} />
+        <meshStandardMaterial
+          color={coreColor}
+          wireframe
+          transparent
+          opacity={opacityInner}
+          emissive={coreColor}
+          emissiveIntensity={isDark ? 0.6 : 0.2}
+          depthWrite={false}
+        />
+      </mesh>
+
+      {/* Orbital Ring 1 - Emerald */}
+      <mesh ref={ringRef1} rotation={[Math.PI / 3, 0, 0]}>
+        <torusGeometry args={[4.2, 0.018, 16, 120]} />
+        <meshStandardMaterial
           color="#10B981"
           transparent
-          opacity={0.04}
+          opacity={isDark ? 0.35 : 0.15}
+          emissive="#10B981"
+          emissiveIntensity={0.5}
+          depthWrite={false}
+        />
+      </mesh>
+
+      {/* Orbital Ring 2 - Electric Cyan */}
+      <mesh ref={ringRef2} rotation={[-Math.PI / 4, Math.PI / 6, 0]}>
+        <torusGeometry args={[4.8, 0.015, 16, 120]} />
+        <meshStandardMaterial
+          color="#06B6D4"
+          transparent
+          opacity={isDark ? 0.3 : 0.12}
+          emissive="#06B6D4"
+          emissiveIntensity={0.5}
+          depthWrite={false}
+        />
+      </mesh>
+
+      {/* Orbital Ring 3 - Violet Accent */}
+      <mesh ref={ringRef3} rotation={[Math.PI / 6, -Math.PI / 3, 0]}>
+        <torusGeometry args={[5.4, 0.012, 16, 120]} />
+        <meshStandardMaterial
+          color="#8B5CF6"
+          transparent
+          opacity={isDark ? 0.25 : 0.08}
+          emissive="#8B5CF6"
+          emissiveIntensity={0.4}
           depthWrite={false}
         />
       </mesh>
@@ -140,77 +210,23 @@ function ArcSphere({ isBridging = false }: { isBridging?: boolean }) {
   );
 }
 
-// ELEMENT 3: Subtle network lines
-function ChainLines() {
-  const linesRef = useRef<THREE.LineSegments>(null);
-
-  const [positions, colors] = useMemo(() => {
-    const lineCount = 10;
-    const pos = new Float32Array(lineCount * 2 * 3);
-    const cols = new Float32Array(lineCount * 2 * 3);
-    const colorCenter = new THREE.Color('#10B981');
-
-    for (let i = 0; i < lineCount; i++) {
-      pos[i * 6] = 0;
-      pos[i * 6 + 1] = 0;
-      pos[i * 6 + 2] = -6;
-
-      cols[i * 6] = colorCenter.r;
-      cols[i * 6 + 1] = colorCenter.g;
-      cols[i * 6 + 2] = colorCenter.b;
-
-      const angle = (i / lineCount) * Math.PI * 2;
-      const radius = 6 + Math.random() * 4;
-      pos[i * 6 + 3] = Math.cos(angle) * radius;
-      pos[i * 6 + 4] = Math.sin(angle) * radius;
-      pos[i * 6 + 5] = -6 + (Math.random() - 0.5) * 6;
-
-      cols[i * 6 + 3] = 0.2;
-      cols[i * 6 + 4] = 0.5;
-      cols[i * 6 + 5] = 0.8;
-    }
-    return [pos, cols];
-  }, []);
-
-  return (
-    <lineSegments ref={linesRef}>
-      <bufferGeometry>
-        <bufferAttribute
-          attach="attributes-position"
-          args={[positions, 3]}
-        />
-        <bufferAttribute
-          attach="attributes-color"
-          args={[colors, 3]}
-        />
-      </bufferGeometry>
-      <lineBasicMaterial
-        vertexColors
-        transparent
-        opacity={0.04}
-        depthWrite={false}
-      />
-    </lineSegments>
-  );
-}
-
-// Master group handler for interactive pointer parallax
+// 3. INTERACTIVE MOUSE PARALLAX CONTROLLER
 function InteractiveGroup({ children }: { children: React.ReactNode }) {
   const groupRef = useRef<THREE.Group>(null);
 
   useFrame((state) => {
     if (!groupRef.current) return;
-    const targetX = state.pointer.x * 0.25; // Enhanced visible parallax 3D effect
-    const targetY = state.pointer.y * 0.25;
+    const targetX = state.pointer.x * 0.45;
+    const targetY = state.pointer.y * 0.45;
 
-    groupRef.current.rotation.y += (targetX - groupRef.current.rotation.y) * 0.04;
-    groupRef.current.rotation.x += (-targetY - groupRef.current.rotation.x) * 0.04;
+    groupRef.current.rotation.y += (targetX - groupRef.current.rotation.y) * 0.05;
+    groupRef.current.rotation.x += (-targetY - groupRef.current.rotation.x) * 0.05;
   });
 
   return <group ref={groupRef}>{children}</group>;
 }
 
-export default function ArcBackground({ isWalletConnected = false, theme = 'light' }: ArcBackgroundProps) {
+export default function ArcBackground({ isWalletConnected = false, theme = 'dark' }: ArcBackgroundProps) {
   const [mounted, setMounted] = useState(false);
   const [isBridging, setIsBridging] = useState(false);
 
@@ -232,28 +248,40 @@ export default function ArcBackground({ isWalletConnected = false, theme = 'ligh
   if (!mounted) return null;
 
   const isDark = theme === 'dark';
-  const wrapperBg = isDark ? 'bg-[#070B13]' : 'bg-[#F8FAFC]';
-  const radialGlow = isDark 
-    ? 'bg-[radial-gradient(ellipse_at_top,rgba(16,185,129,0.06)_0%,transparent_80%)]' 
-    : 'bg-[radial-gradient(ellipse_at_top,rgba(16,185,129,0.04)_0%,transparent_80%)]';
+  
+  // Sleek dark space backdrop with dual glowing gradients
+  const wrapperBg = isDark ? 'bg-[#050811]' : 'bg-[#F8FAFC]';
+  const glowOverlay = isDark 
+    ? 'bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(16,185,129,0.14),rgba(6,182,212,0.08)_50%,transparent_100%)]' 
+    : 'bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(16,185,129,0.08),rgba(59,130,246,0.05)_50%,transparent_100%)]';
 
   return (
-    <div className={`fixed inset-0 z-[-1] pointer-events-none w-screen h-screen select-none overflow-hidden ${wrapperBg} transition-colors duration-300`}>
-      {/* Background radial gradient mask for elegant ambient light depth */}
-      <div className={`absolute inset-0 ${radialGlow} pointer-events-none`} />
+    <div className={`fixed inset-0 z-[-1] pointer-events-none w-screen h-screen select-none overflow-hidden ${wrapperBg} transition-colors duration-500`}>
+      {/* Background radial glow */}
+      <div className={`absolute inset-0 ${glowOverlay} pointer-events-none`} />
+
+      {/* Ambient glass grid pattern */}
+      <div 
+        className="absolute inset-0 opacity-[0.03] dark:opacity-[0.06] pointer-events-none"
+        style={{
+          backgroundImage: 'radial-gradient(#10B981 1px, transparent 1px)',
+          backgroundSize: '36px 36px',
+        }}
+      />
 
       <Canvas
-        camera={{ position: [0, 0, 5], fov: 60 }}
-        dpr={[1, 1.5]}
-        gl={{ antialias: true, alpha: true }}
+        camera={{ position: [0, 0, 5], fov: 58 }}
+        dpr={[1, 2]}
+        gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}
         style={{ width: '100vw', height: '100vh' }}
       >
-        <ambientLight intensity={1.3} />
+        <ambientLight intensity={isDark ? 0.8 : 1.2} />
+        <pointLight position={[10, 10, 10]} intensity={isDark ? 1.5 : 1.0} color="#10B981" />
+        <pointLight position={[-10, -10, -5]} intensity={isDark ? 1.2 : 0.8} color="#06B6D4" />
 
         <InteractiveGroup>
-          <FloatingParticles isWalletConnected={isWalletConnected} isBridging={isBridging} />
-          <ArcSphere isBridging={isBridging} />
-          <ChainLines />
+          <FloatingParticles isBridging={isBridging} theme={theme} />
+          <ArcSphere3D isBridging={isBridging} theme={theme} />
         </InteractiveGroup>
       </Canvas>
     </div>

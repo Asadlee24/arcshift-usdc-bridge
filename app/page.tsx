@@ -25,14 +25,14 @@ interface SpotlightProps {
 
 function DeveloperSpotlight({ theme = 'light' }: SpotlightProps) {
   const isDark = theme === 'dark';
-  
-  const cardBg = isDark ? 'bg-[#0F172A] border-[#1E293B]' : 'bg-white border-slate-200';
+
+  const cardBg = isDark ? 'glass-panel-dark border-[#10B981]/20 hover:border-[#10B981]/40' : 'bg-white/95 border-slate-200 shadow-crisp-lg';
   const headingColor = isDark ? 'text-white' : 'text-slate-900';
-  const descColor = isDark ? 'text-slate-400' : 'text-slate-500';
+  const descColor = isDark ? 'text-slate-300' : 'text-slate-500';
 
   return (
     <div className="w-full max-w-5xl mx-auto py-6 px-4 select-none mb-10">
-      <div className={`${cardBg} border rounded-[20px] p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-6 shadow-sm hover:shadow-md transition-shadow`}>
+      <div className={`${cardBg} border rounded-[20px] p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-6 transition-all duration-300`}>
         
         {/* Left column: Security description */}
         <div className="flex items-center gap-4 flex-col sm:flex-row text-center sm:text-left">
@@ -96,6 +96,17 @@ export default function Home() {
       }
     }
   }, []);
+
+  // Sync theme with document class list
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      if (theme === 'dark') {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    }
+  }, [theme]);
 
   const handleToggleTheme = () => {
     const nextTheme = theme === 'dark' ? 'light' : 'dark';

@@ -587,10 +587,10 @@ export default function BridgeCard({ theme = 'light' }: BridgeCardProps) {
   //     rather than floating.
   //  2. Muted text is #5C6470, not slate-500. slate-500 on white is ~4.0:1 and
   //     misses WCAG AA for body copy; #5C6470 is ~5.7:1 and passes.
-  const cardBg = isDark ? 'bg-[#0F172A]' : 'bg-white shadow-crisp-lg';
-  const cardBorder = isDark ? 'border-[#1E293B]' : 'border-[#E8E8EC]';
+  const cardBg = isDark ? 'glass-panel-dark text-white shadow-2xl' : 'bg-white/95 backdrop-blur-md shadow-crisp-lg text-[#12141A]';
+  const cardBorder = isDark ? 'border-[#10B981]/25 hover:border-[#10B981]/50 transition-all duration-300' : 'border-[#E8E8EC] hover:border-[#10B981]/30 transition-all duration-300';
   const inputBg = isDark
-    ? 'bg-[#131B2E] border-[#1E293B]'
+    ? 'bg-[#080D1A]/90 border-[#1E293B] focus-within:border-[#10B981]/60 focus-within:bg-[#0C1220] transition-colors duration-200'
     : 'bg-[#F6F7F9] border-[#E8E8EC] focus-within:border-[#10B981]/50 focus-within:bg-white transition-colors duration-200';
   const tabBg = isDark ? 'bg-[#131B2E]' : 'bg-[#F1F2F5]';
   const activeTabBg = isDark
