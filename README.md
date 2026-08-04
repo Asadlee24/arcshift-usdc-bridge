@@ -110,6 +110,12 @@ Toggling Auto-Relay Service (Gasless Mode) ON:
 
 ---
 
+### 10. CORS Proxy & Multi-Node Fallback Infrastructure
+- **Serverless RPC Proxy:** Next.js `/api/rpc/[chainId]` endpoint proxies RPC requests server-side, bypassing browser CORS restrictions for chains with missing CORS headers (e.g. Arc Testnet).
+- **Latency-Ranked Fallbacks:** Automatically ranks multi-node endpoints by latency every 30s and falls back if a primary node hangs or fails.
+
+---
+
 ## 💻 Local Development
 
 Create a `.env.local` file:
