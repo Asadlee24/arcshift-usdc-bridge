@@ -20,7 +20,7 @@ import {
   lineaSepolia,
   polygonAmoy,
 } from 'wagmi/chains';
-import { http, fallback, type Transport } from 'wagmi';
+import { type Transport } from 'wagmi';
 import { arcTestnet } from './arcChain';
 import {
   unichainSepolia,
@@ -38,7 +38,7 @@ import {
   plumeTestnet,
   xdcApothem,
 } from './allChains';
-import { getClientRpcUrls } from './rpcEndpoints';
+import { transportForChain } from './publicClient';
 
 // WalletConnect project ID from env
 const projectId = process.env.NEXT_PUBLIC_WC_PROJECT_ID || '148d42d3d9e29a8a706509f6df849a78';
@@ -61,28 +61,10 @@ const projectId = process.env.NEXT_PUBLIC_WC_PROJECT_ID || '148d42d3d9e29a8a7065
  *    per-request timeout is bounded so a slow node can't stall the UI.
  */
 function transportFor(chainId: number): Transport {
-  const urls = getClientRpcUrls(chainId);
-
-  const options = {
-    // Coalesce concurrent calls into one HTTP request (~16ms collection window).
-    batch: { wait: 16 },
-    // Bound each attempt so a hung node fails over quickly instead of hanging the UI.
-    timeout: 8_000,
-    retryCount: 1,
-    retryDelay: 150,
-  } as const;
-
-  if (urls.length === 0) return http(undefined, options);
-  if (urls.length === 1) return http(urls[0], options);
-
-  // Ranking re-sorts endpoints by observed latency and stability every 30s, so traffic
-  // migrates to whichever node is currently healthiest rather than sticking with a
-  // degraded primary.
-
-  return fallback(
-    urls.map((url) => http(url, options)),
-    { rank: { interval: 30_000 } }
-  );
+  // Delegates to lib/publicClient so wagmi, the Circle SDK, and every ad-hoc read share one
+  // definition of "how do I reach this chain". Previously this logic was duplicated here,
+  // which let the SDK drift onto its own CORS-blocked endpoints.
+  return transportForChain(chainId);
 }
 
 export const config = getDefaultConfig({

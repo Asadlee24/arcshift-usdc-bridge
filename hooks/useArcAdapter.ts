@@ -3,6 +3,7 @@
 
 import { useState, useCallback } from 'react';
 import { createViemAdapterFromProvider } from '@circle-fin/adapter-viem-v2';
+import { circlePublicClientFactory } from '../lib/publicClient';
 
 export function useArcAdapter() {
   const [isLoading, setIsLoading] = useState(false);
@@ -24,6 +25,10 @@ export function useArcAdapter() {
       // Instantiate the official Circle CCTP adapter for Viem
       const adapter = await createViemAdapterFromProvider({
         provider: window.ethereum as any, // Cast window.ethereum provider to Viem's provider shape
+        // Route the SDK's own reads through our endpoint registry. Omitting this makes the
+        // SDK fall back to its bundled endpoint table, which calls Arc's CORS-blocked RPC
+        // directly and fails every balanceOf with "Failed to fetch".
+        getPublicClient: circlePublicClientFactory,
       });
 
       return adapter;

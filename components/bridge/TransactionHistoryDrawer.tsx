@@ -9,9 +9,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Trash2, ExternalLink, Calendar, ArrowRight, Activity, ShieldAlert, CheckCircle2, Clock, Loader2, Search } from 'lucide-react';
 import { useTransactionHistory, BridgeTransaction } from '../../hooks/useTransactionHistory';
 import { getChainById, SUPPORTED_CHAINS } from '../../constants/chains';
-import { createPublicClient, http, keccak256 } from 'viem';
+import { keccak256 } from 'viem';
 import { writeContract, waitForTransactionReceipt, getAccount, switchChain, getGasPrice } from '@wagmi/core';
 import { config } from '../../lib/wagmi';
+import { rpcCall } from '../../lib/rpcClient';
+import { getPublicClientForChain } from '../../lib/publicClient';
 
 const MESSAGE_TRANSMITTER_ABI = [
   {
@@ -126,48 +128,40 @@ export default function TransactionHistoryDrawer({
     setScanError(null);
     setScanResult(null);
 
+    // Chains are identified by id rather than by a single URL. rpcCall resolves the id
+    // against lib/rpcEndpoints, which fails over between endpoints and substitutes the
+    // /api/rpc proxy for CORS-blocked ones. Scanning c.rpcUrl directly (as this did before)
+    // meant Arc could never be searched from the browser: its only public endpoint sends no
+    // CORS headers, so the lookup always failed and a valid Arc hash was reported as
+    // "not found on any supported testnets".
     interface ScanRpcConfig {
       id: number;
       name: string;
-      url: string;
       domain: number;
     }
 
-    // List of RPCs mapped dynamically from SUPPORTED_CHAINS config
+    // List of chains mapped dynamically from SUPPORTED_CHAINS config
     const rpcs: ScanRpcConfig[] = SUPPORTED_CHAINS
       .filter(c => c.cctpDomain !== undefined && !c.isComingSoon)
       .map(c => ({
         id: c.id,
         name: c.name,
-        url: c.rpcUrl,
         domain: c.cctpDomain!
       }));
 
     let foundReceipt: any = null;
     let foundChain: ScanRpcConfig | null = null;
 
-    // Search parallel across all rpcs — use mutex flag to avoid double-assign
+    // Search parallel across all chains — use mutex flag to avoid double-assign
     const results = await Promise.all(
       rpcs.map(async (rpc) => {
-        try {
-          const res = await fetch(rpc.url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              jsonrpc: '2.0',
-              method: 'eth_getTransactionReceipt',
-              params: [cleanHash],
-              id: 1
-            })
-          });
-          if (res.ok) {
-            const data = await res.json();
-            if (data?.result) return { receipt: data.result, chain: rpc };
-          }
-        } catch (e) {
-          // ignore RPC timeout
-        }
-        return null;
+        // rpcCall returns null on failure rather than throwing, so an unreachable chain
+        // simply drops out of the search instead of rejecting the whole Promise.all.
+        const receipt = await rpcCall<any>(rpc.id, {
+          method: 'eth_getTransactionReceipt',
+          params: [cleanHash],
+        });
+        return receipt ? { receipt, chain: rpc } : null;
       })
     );
     const found = results.find(r => r !== null);
@@ -261,9 +255,9 @@ export default function TransactionHistoryDrawer({
 
       if (destChain) {
         try {
-          const destClient = createPublicClient({
-            transport: http(destChain.url)
-          });
+          // Registry-aware client, so a CORS-blocked destination (Arc) is read through the
+          // proxy instead of failing and leaving a completed mint displayed as "pending".
+          const destClient = getPublicClientForChain(destChain.id);
           const used = await destClient.readContract({
             address: getMessageTransmitterAddress(destChain.id) as `0x${string}`,
             abi: [

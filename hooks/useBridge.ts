@@ -16,6 +16,7 @@ import { Connection, PublicKey as SolanaPublicKey } from '@solana/web3.js';
 import { createViemAdapterFromProvider } from '@circle-fin/adapter-viem-v2';
 import { appKit } from '../lib/appKit';
 import { getSolanaRpcUrl } from '../lib/rpcEndpoints';
+import { circlePublicClientFactory } from '../lib/publicClient';
 
 // Helper to build a Solana provider compliant with Circle's SolanaAdapter Zod validation requirements
 function buildSolanaProviderAdapter(solanaWallet: any) {
@@ -587,6 +588,10 @@ export function useBridge() {
           }
           sourceAdapter = await createViemAdapterFromProvider({
             provider: window.ethereum as any,
+            // Without this the SDK builds its own client from a hardcoded endpoint table and
+            // calls Arc's RPC directly, which sends no CORS headers — the "Read contract
+            // failed / Failed to fetch" balanceOf error. See lib/publicClient.ts.
+            getPublicClient: circlePublicClientFactory,
           });
         }
 
@@ -612,6 +617,7 @@ export function useBridge() {
           }
           destAdapter = await createViemAdapterFromProvider({
             provider: window.ethereum as any,
+            getPublicClient: circlePublicClientFactory,
           });
         }
 
