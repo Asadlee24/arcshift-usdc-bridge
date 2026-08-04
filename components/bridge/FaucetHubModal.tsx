@@ -101,6 +101,10 @@ const getFaucetsForChain = (chain: ChainMetadata): FaucetLink[] => {
     case 51: // XDC Apothem
       faucets.unshift({ name: 'XDC Apothem Faucet', url: 'https://faucet.apothem.network', type: 'gas' });
       break;
+    case 0: // Solana Devnet
+      faucets.unshift({ name: 'Solana Devnet SOL Faucet', url: 'https://faucet.solana.com/', type: 'gas' });
+      faucets.unshift({ name: 'SolFaucet (Devnet SOL)', url: 'https://solfaucet.com/', type: 'gas' });
+      break;
   }
 
   return faucets;
