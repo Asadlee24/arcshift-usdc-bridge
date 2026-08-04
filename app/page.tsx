@@ -26,27 +26,29 @@ interface SpotlightProps {
 function DeveloperSpotlight({ theme = 'light' }: SpotlightProps) {
   const isDark = theme === 'dark';
 
-  const cardBg = isDark ? 'glass-panel-dark border-[#10B981]/20 hover:border-[#10B981]/40' : 'bg-white/95 border-slate-200 shadow-crisp-lg';
-  const headingColor = isDark ? 'text-white' : 'text-slate-900';
-  const descColor = isDark ? 'text-slate-300' : 'text-slate-500';
+  const cardBg = isDark
+    ? 'glass-panel-dark border-[#C8922A]/25 hover:border-[#C8922A]/45'
+    : 'bg-white/95 border-[#E8E6DF] shadow-crisp-lg hover:border-[#C8922A]/35';
+  const headingColor = isDark ? 'text-[#F5F0E8]' : 'text-slate-900';
+  const descColor = isDark ? 'text-[#A09880]' : 'text-slate-600';
 
   return (
-    <div className="w-full max-w-5xl mx-auto py-6 px-4 select-none mb-10">
-      <div className={`${cardBg} border rounded-[20px] p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-6 transition-all duration-300`}>
+    <div className="w-full max-w-5xl mx-auto py-4 sm:py-6 px-4 select-none mb-10">
+      <div className={`${cardBg} border rounded-[20px] p-5 sm:p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-5 sm:gap-6 transition-all duration-300`}>
         
         {/* Left column: Security description */}
-        <div className="flex items-center gap-4 flex-col sm:flex-row text-center sm:text-left">
-          <div className="h-12 w-12 rounded-full bg-[#10B981]/15 text-[#10B981] flex items-center justify-center flex-shrink-0 animate-pulse">
-            <Shield className="h-6 w-6" />
+        <div className="flex items-center sm:items-start md:items-center gap-4 flex-col sm:flex-row text-center sm:text-left">
+          <div className="h-12 w-12 rounded-full bg-[#C8922A]/15 text-[#C8922A] flex items-center justify-center flex-shrink-0">
+            <Shield className="h-6 w-6 text-[#C8922A]" />
           </div>
           <div>
-            <span className="inline-block text-[10px] font-extrabold text-[#10B981] bg-[#10B981]/15 px-2 py-0.5 rounded-[4px] tracking-wider uppercase mb-1 border border-[#10B981]/25">
+            <span className="inline-block text-[10px] font-black text-[#C8922A] bg-[#C8922A]/15 px-2.5 py-0.5 rounded-[4px] tracking-wider uppercase mb-1.5 border border-[#C8922A]/30">
               SECURITY AUDITED
             </span>
-            <h3 className={`text-[16px] font-black ${headingColor}`}>
+            <h3 className={`text-[16px] font-bold ${headingColor}`}>
               Engineered & Secured by Asad Lee
             </h3>
-            <p className={`text-[12px] font-semibold ${descColor} max-w-xl mt-1 leading-relaxed`}>
+            <p className={`text-[12px] sm:text-[13px] font-medium ${descColor} max-w-xl mt-1 leading-relaxed`}>
               Designed with rigorous security principles by a Cybersecurity Specialist from IMSciences. Certified secure stablecoin CCTP integration protecting cross chain assets.
             </p>
           </div>
@@ -57,7 +59,7 @@ function DeveloperSpotlight({ theme = 'light' }: SpotlightProps) {
           href="https://asad-lee-portfolio.vercel.app"
           target="_blank"
           rel="noopener noreferrer"
-          className="flex-shrink-0 h-11 px-6 rounded-[10px] bg-[#10B981] hover:bg-[#059669] text-[#070B13] text-xs font-black flex items-center justify-center transition-colors shadow-sm select-none cursor-pointer"
+          className="w-full sm:w-auto flex-shrink-0 h-11 px-6 rounded-[10px] bg-[#C8922A] hover:bg-[#A87520] text-white text-xs font-bold flex items-center justify-center transition-colors shadow-sm select-none cursor-pointer"
         >
           View Developer Portfolio
         </a>
