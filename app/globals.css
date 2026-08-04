@@ -1,0 +1,100 @@
+/* app/globals.css */
+/* Premium Dark-themed design system matching ArcID with rich slate black and vibrant emerald green accents */
+
+@import "tailwindcss";
+
+@theme {
+  --color-bg-page: #070B13;
+  --color-bg-card: #0F172A;
+  --color-border-card: #1E293B;
+  --color-text-primary: #FFFFFF;
+  --color-text-muted: #94A3B8;
+  --color-text-subtle: #4B5563;
+  --color-accent-green: #10B981;
+  --color-accent-green-hover: #059669;
+}
+
+:root {
+  --bg-page: #070B13;
+  --bg-card: #0F172A;
+  --bg-input-box: #131B2E;
+  --border-card: #1E293B;
+  --text-primary: #FFFFFF;
+  --text-muted: #94A3B8;
+  --text-subtle: #4B5563;
+  --accent-green: #10B981;
+  --accent-green-light: rgba(16, 185, 129, 0.1);
+  --success: #10B981;
+  --warning: #F59E0B;
+  --error: #EF4444;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  overflow-x: hidden;
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+}
+
+/* Custom Scrollbar for list selections */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 99px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-green);
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Shake Animation for Input Errors */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  75% { transform: translateX(4px); }
+}
+
+.animate-shake {
+  animation: shake 0.2s ease-in-out 0s 2;
+}
+
+/* Custom dark shadow utilities */
+.shadow-relay-card {
+  box-shadow: 
+    0 1px 3px 0 rgba(0, 0, 0, 0.5),
+    0 20px 25px -5px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+.shadow-relay-dropdown {
+  box-shadow: 
+    0 4px 6px -1px rgba(0, 0, 0, 0.5),
+    0 10px 15px -3px rgba(0, 0, 0, 0.6),
+    0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+/* Scanline Animation for Step Tracker */
+@keyframes scanline {
+  0% { transform: translateX(-100px); }
+  100% { transform: translateX(500px); }
+}
+
+.animate-scanline {
+  animation: scanline 4s linear infinite;
+}
+
+/* Marquee Animation for Live Feed ticker */
+@keyframes marquee {
+  0% { transform: translateX(0%); }
+  100% { transform: translateX(-100%); }
+}
+
