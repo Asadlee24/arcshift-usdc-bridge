@@ -104,7 +104,12 @@ export default function Home() {
   };
 
   const isDark = theme === 'dark';
-  const pageBg = isDark ? 'bg-[#070B13] text-white' : 'bg-[#F8FAFC] text-slate-900';
+  // Light mode uses .arc-canvas (hairline grid + soft brand washes, defined in
+  // globals.css) rather than a flat fill, so the page has texture behind the
+  // white cards instead of white-on-white.
+  const pageBg = isDark
+    ? 'bg-[#070B13] text-white'
+    : 'arc-canvas text-[#12141A]';
 
   if (isWidgetMode) {
     const activeTheme = forcedTheme || theme;

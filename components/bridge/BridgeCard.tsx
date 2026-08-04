@@ -1,5 +1,5 @@
 // components/bridge/BridgeCard.tsx
-// Redesigned main bridge widget card replicating the Relay.link user experience (Supports Dark/Light theme and spacious sizing) - Stable USDC-only Version
+// Main bridge widget card (supports dark/light theme) — stable USDC-only version.
 
 'use client';
 
@@ -584,15 +584,29 @@ export default function BridgeCard({ theme = 'light' }: BridgeCardProps) {
 
   // Theme variable helper mapping
   const isDark = theme === 'dark';
-  const cardBg = isDark ? 'bg-[#0F172A]' : 'bg-white';
-  const cardBorder = isDark ? 'border-[#1E293B]' : 'border-slate-200';
-  const inputBg = isDark ? 'bg-[#131B2E] border-[#1E293B]' : 'bg-slate-50 border-slate-200';
-  const tabBg = isDark ? 'bg-[#131B2E]' : 'bg-slate-100';
-  const activeTabBg = isDark ? 'bg-[#0F172A] text-white' : 'bg-white text-slate-900 shadow-sm';
-  const textMuted = isDark ? 'text-slate-400' : 'text-slate-500';
-  const textTitleMuted = isDark ? 'text-slate-500' : 'text-slate-400';
-  const textPrimary = isDark ? 'text-white' : 'text-slate-900';
-  const trendingPill = isDark ? 'bg-[#131B2E] border-[#1E293B] text-slate-300 hover:border-slate-600' : 'bg-slate-50 border-slate-200 text-slate-700 hover:border-slate-400';
+  // Light values come from the design system in globals.css:
+  //   surface #FFFFFF / sunken #F6F7F9 / hairline #E8E8EC / ink #12141A
+  // Two deliberate choices here:
+  //  1. The card uses .shadow-crisp-lg (many tight low-alpha layers) instead of
+  //     a single large blur. That is what makes a white card read as "crisp"
+  //     rather than floating.
+  //  2. Muted text is #5C6470, not slate-500. slate-500 on white is ~4.0:1 and
+  //     misses WCAG AA for body copy; #5C6470 is ~5.7:1 and passes.
+  const cardBg = isDark ? 'bg-[#0F172A]' : 'bg-white shadow-crisp-lg';
+  const cardBorder = isDark ? 'border-[#1E293B]' : 'border-[#E8E8EC]';
+  const inputBg = isDark
+    ? 'bg-[#131B2E] border-[#1E293B]'
+    : 'bg-[#F6F7F9] border-[#E8E8EC] focus-within:border-[#10B981]/50 focus-within:bg-white transition-colors duration-200';
+  const tabBg = isDark ? 'bg-[#131B2E]' : 'bg-[#F1F2F5]';
+  const activeTabBg = isDark
+    ? 'bg-[#0F172A] text-white'
+    : 'bg-white text-[#12141A] shadow-crisp';
+  const textMuted = isDark ? 'text-slate-400' : 'text-[#5C6470]';
+  const textTitleMuted = isDark ? 'text-slate-500' : 'text-[#8A919E]';
+  const textPrimary = isDark ? 'text-white' : 'text-[#12141A]';
+  const trendingPill = isDark
+    ? 'bg-[#131B2E] border-[#1E293B] text-slate-300 hover:border-slate-600'
+    : 'bg-white border-[#E8E8EC] text-[#12141A] hover:border-[#10B981]/40 shadow-crisp transition-colors duration-200';
 
   const isFormVisible = status !== 'bridging' && status !== 'success' && !isSwapping && !swapSuccess;
   const hasValidAmount = !amountError && amount !== '' && parseFloat(amount) > 0;
@@ -640,8 +654,8 @@ export default function BridgeCard({ theme = 'light' }: BridgeCardProps) {
                   type="button"
                   onClick={() => { playClickSound(); setActiveTab('bridge'); }}
                   className={`${activeTab === 'bridge'
-                      ? activeTabBg
-                      : isDark ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-900'
+                    ? activeTabBg
+                    : isDark ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-900'
                     } rounded-[6px] px-3.5 py-1 text-xs font-bold cursor-pointer transition-colors`}
                 >
                   Bridge
@@ -650,8 +664,8 @@ export default function BridgeCard({ theme = 'light' }: BridgeCardProps) {
                   type="button"
                   onClick={() => { playClickSound(); setActiveTab('swap'); }}
                   className={`${activeTab === 'swap'
-                      ? activeTabBg
-                      : isDark ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-900'
+                    ? activeTabBg
+                    : isDark ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-900'
                     } rounded-[6px] px-3.5 py-1 text-xs font-bold cursor-pointer transition-colors flex items-center gap-1`}
                 >
                   Swap
@@ -676,8 +690,8 @@ export default function BridgeCard({ theme = 'light' }: BridgeCardProps) {
                             <span className={`h-3 w-8 ${isDark ? 'bg-slate-800' : 'bg-slate-200'} animate-pulse rounded`} />
                           ) : (
                             <span className={`text-[11px] font-mono font-bold ${amountError
-                                ? 'text-red-400'
-                                : isDark ? 'text-slate-300' : 'text-slate-700'
+                              ? 'text-red-400'
+                              : isDark ? 'text-slate-300' : 'text-slate-700'
                               }`}>{fromBalance} USDC</span>
                           )}
                           <button
@@ -839,8 +853,8 @@ export default function BridgeCard({ theme = 'light' }: BridgeCardProps) {
                                         setIsTokenPickerOpen(null);
                                       }}
                                       className={`w-full p-2 rounded-lg border flex items-center justify-between transition-colors cursor-pointer text-left ${sellToken.symbol === token.symbol
-                                          ? 'border-[#10B981] bg-[#10B981]/5 text-white'
-                                          : 'border-transparent bg-transparent hover:bg-slate-800 text-slate-300'
+                                        ? 'border-[#10B981] bg-[#10B981]/5 text-white'
+                                        : 'border-transparent bg-transparent hover:bg-slate-800 text-slate-300'
                                         }`}
                                     >
                                       <div className="flex items-center gap-2">
@@ -872,8 +886,8 @@ export default function BridgeCard({ theme = 'light' }: BridgeCardProps) {
                         setAmount('');
                       }}
                       className={`absolute top-[115px] left-1/2 -translate-x-1/2 -translate-y-1/2 h-8 w-8 rounded-full border flex items-center justify-center transition-all duration-200 hover:scale-110 z-20 cursor-pointer ${isDark
-                          ? 'bg-[#0F172A] border-[#1E293B] hover:border-slate-500 text-[#10B981] hover:text-white shadow-[0_0_12px_rgba(16,185,129,0.15)]'
-                          : 'bg-white border-slate-200 hover:border-slate-400 text-[#10B981] hover:text-[#059669] shadow-md'
+                        ? 'bg-[#0F172A] border-[#1E293B] hover:border-slate-500 text-[#10B981] hover:text-white shadow-[0_0_12px_rgba(16,185,129,0.15)]'
+                        : 'bg-white border-slate-200 hover:border-slate-400 text-[#10B981] hover:text-[#059669] shadow-md'
                         }`}
                     >
                       <ArrowDown className="h-4 w-4" />
@@ -943,8 +957,8 @@ export default function BridgeCard({ theme = 'light' }: BridgeCardProps) {
                                         setIsTokenPickerOpen(null);
                                       }}
                                       className={`w-full p-2 rounded-lg border flex items-center justify-between transition-colors cursor-pointer text-left ${buyToken.symbol === token.symbol
-                                          ? 'border-[#10B981] bg-[#10B981]/5 text-white'
-                                          : 'border-transparent bg-transparent hover:bg-slate-800 text-slate-300'
+                                        ? 'border-[#10B981] bg-[#10B981]/5 text-white'
+                                        : 'border-transparent bg-transparent hover:bg-slate-800 text-slate-300'
                                         }`}
                                     >
                                       <div className="flex items-center gap-2">
@@ -1073,8 +1087,8 @@ export default function BridgeCard({ theme = 'light' }: BridgeCardProps) {
                   onClick={handleSwapSubmit}
                   disabled={!amount || parseFloat(amount) <= 0 || parseFloat(amount) > parseFloat(sellTokenBalance)}
                   className={`w-full h-12 rounded-[16px] text-sm font-black uppercase tracking-wider transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer ${!amount || parseFloat(amount) <= 0 || parseFloat(amount) > parseFloat(sellTokenBalance)
-                      ? 'bg-slate-800/40 text-slate-600 border border-slate-800/20 cursor-not-allowed'
-                      : 'bg-[#10B981] hover:bg-[#059669] text-[#070B13] shadow-[0_0_15px_rgba(16,185,129,0.3)] animate-pulse'
+                    ? 'bg-slate-800/40 text-slate-600 border border-slate-800/20 cursor-not-allowed'
+                    : 'bg-[#10B981] hover:bg-[#059669] text-[#070B13] shadow-[0_0_15px_rgba(16,185,129,0.3)] animate-pulse'
                     }`}
                 >
                   {parseFloat(amount) > parseFloat(sellTokenBalance) ? `INSUFFICIENT ${sellToken.symbol}` : 'SWAP TOKENS'}
