@@ -664,6 +664,7 @@ export default function BridgeCard({ theme = 'light' }: BridgeCardProps) {
                   {activeTab !== 'swap' && (
                     <span className="text-[8px] font-black bg-[#10B981]/20 text-[#10B981] px-1 rounded-full">NEW</span>
                   )}
+                </button>
               </div>
 
               {activeTab === 'swap' && (
