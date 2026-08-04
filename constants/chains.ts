@@ -1,8 +1,15 @@
-// constants/chains.ts - Force Vercel Redeploy
+// constants/chains.ts
 // Arc-supported USDC Bridge Chain Configurations — All BridgeChain enum chains from Arc docs
 // EVM chains: fully functional CCTP.
+//
+// RPC URLs are no longer hardcoded here. They come from lib/rpcEndpoints.ts, which holds a
+// single health-ordered list per chain (with CORS-blocked endpoints routed through
+// /api/rpc). Several URLs previously hardcoded in this file are dead — see that file.
+
+import { getPrimaryRpcUrl, getSolanaRpcUrl } from '../lib/rpcEndpoints';
 
 export interface ChainMetadata {
+
   id: number;
   appKitId: string;        // BridgeChain enum value from @circle-fin/app-kit
   name: string;
@@ -28,9 +35,10 @@ export const SUPPORTED_CHAINS: ChainMetadata[] = [
     iconUrl: 'https://i.ibb.co/x8BwmWJR/6ceb4b2f-4218-408d-b61a-c34d0f3f181e.png',
     color: '#10B981',
     explorerUrl: 'https://testnet.arcscan.app',
-    rpcUrl: 'https://rpc.testnet.arc.network',
+    rpcUrl: getPrimaryRpcUrl(5042002),
     usdcAddress: '0x3600000000000000000000000000000000000000',
     isNativeArc: true,
+
     cctpDomain: 26,
   },
 
@@ -43,15 +51,16 @@ export const SUPPORTED_CHAINS: ChainMetadata[] = [
     iconUrl: 'https://icons.llamao.fi/icons/chains/rsz_ethereum.jpg',
     color: '#627EEA',
     explorerUrl: 'https://sepolia.etherscan.io',
-    rpcUrl: 'https://ethereum-sepolia-rpc.publicnode.com',
+    rpcUrl: getPrimaryRpcUrl(11155111),
+    // Circle's canonical CCTP USDC on Ethereum Sepolia.
     usdcAddress: '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238',
     isNativeArc: false,
     cctpDomain: 0,
-    // Marked unsupported for CCTP routing in this app. It was previously selectable AND the
-    // default source chain, so the app's landing state was a route that could not succeed.
-    // executeBridge now rejects isComingSoon chains up front instead of letting the burn revert.
-    isComingSoon: true,
+    // Now live. Previously flagged isComingSoon because its RPCs (rpc.sepolia.org -> 404,
+    // eth-sepolia.public.blastapi.io -> 403) were dead, so every read failed. Both are
+    // replaced in lib/rpcEndpoints.ts with healthy endpoints.
   },
+
   {
     id: 84532,
     appKitId: 'Base_Sepolia',
@@ -60,7 +69,8 @@ export const SUPPORTED_CHAINS: ChainMetadata[] = [
     iconUrl: 'https://icons.llamao.fi/icons/chains/rsz_base.jpg',
     color: '#0052FF',
     explorerUrl: 'https://sepolia.basescan.org',
-    rpcUrl: 'https://sepolia.base.org',
+    rpcUrl: getPrimaryRpcUrl(84532),
+
     usdcAddress: '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
     isNativeArc: false,
     cctpDomain: 6,
@@ -73,7 +83,7 @@ export const SUPPORTED_CHAINS: ChainMetadata[] = [
     iconUrl: 'https://icons.llamao.fi/icons/chains/rsz_arbitrum.jpg',
     color: '#28A0F0',
     explorerUrl: 'https://sepolia.arbiscan.io',
-    rpcUrl: 'https://sepolia-rollup.arbitrum.io/rpc',
+    rpcUrl: getPrimaryRpcUrl(421614),
     usdcAddress: '0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d',
     isNativeArc: false,
     cctpDomain: 3,
@@ -86,7 +96,7 @@ export const SUPPORTED_CHAINS: ChainMetadata[] = [
     iconUrl: 'https://icons.llamao.fi/icons/chains/rsz_avalanche.jpg',
     color: '#E84142',
     explorerUrl: 'https://testnet.snowtrace.io',
-    rpcUrl: 'https://api.avax-test.network/ext/bc/C/rpc',
+    rpcUrl: getPrimaryRpcUrl(43113),
     usdcAddress: '0x5425890298aed601595a70AB815c96711a31Bc65',
     isNativeArc: false,
     cctpDomain: 1,
@@ -99,7 +109,7 @@ export const SUPPORTED_CHAINS: ChainMetadata[] = [
     iconUrl: 'https://icons.llamao.fi/icons/chains/rsz_optimism.jpg',
     color: '#FF0420',
     explorerUrl: 'https://sepolia-optimism.etherscan.io',
-    rpcUrl: 'https://sepolia.optimism.io',
+    rpcUrl: getPrimaryRpcUrl(11155420),
     usdcAddress: '0x5fd84259d66Cd46123540766Be93DFE6D43130D7',
     isNativeArc: false,
     cctpDomain: 2,
@@ -113,7 +123,7 @@ export const SUPPORTED_CHAINS: ChainMetadata[] = [
     iconUrl: 'https://icons.llamao.fi/icons/chains/rsz_linea.jpg',
     color: '#60A5FA',
     explorerUrl: 'https://sepolia.lineascan.build',
-    rpcUrl: 'https://rpc.sepolia.linea.build',
+    rpcUrl: getPrimaryRpcUrl(59141),
     usdcAddress: '0xFEce4462D57bD51A6A552365A011b95f0E16d9B7',
     isNativeArc: false,
     cctpDomain: 11,
@@ -126,7 +136,7 @@ export const SUPPORTED_CHAINS: ChainMetadata[] = [
     iconUrl: 'https://icons.llamao.fi/icons/chains/rsz_polygon.jpg',
     color: '#8247E5',
     explorerUrl: 'https://amoy.polygonscan.com',
-    rpcUrl: 'https://rpc-amoy.polygon.technology',
+    rpcUrl: getPrimaryRpcUrl(80002),
     usdcAddress: '0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582',
     isNativeArc: false,
     cctpDomain: 7,
@@ -142,7 +152,7 @@ export const SUPPORTED_CHAINS: ChainMetadata[] = [
     iconUrl: 'https://icons.llamao.fi/icons/chains/rsz_unichain.jpg',
     color: '#FF007A',
     explorerUrl: 'https://unichain-sepolia.blockscout.com',
-    rpcUrl: 'https://sepolia.unichain.org',
+    rpcUrl: getPrimaryRpcUrl(1301),
     usdcAddress: '0x31d0220469e10c4E71834a79b1f276d740d3768F',
     isNativeArc: false,
     cctpDomain: 10,
@@ -155,7 +165,7 @@ export const SUPPORTED_CHAINS: ChainMetadata[] = [
     iconUrl: 'https://icons.llamao.fi/icons/chains/rsz_sonic.jpg',
     color: '#00D4AA',
     explorerUrl: 'https://testnet.sonicscan.org',
-    rpcUrl: 'https://rpc.testnet.soniclabs.com',
+    rpcUrl: getPrimaryRpcUrl(14601),
     usdcAddress: '0x0BA304580ee7c9a980CF72e55f5Ed2E9fd30Bc51',
     isNativeArc: false,
     cctpDomain: 13,
@@ -168,7 +178,7 @@ export const SUPPORTED_CHAINS: ChainMetadata[] = [
     iconUrl: 'https://icons.llamao.fi/icons/chains/rsz_hyperliquid.jpg',
     color: '#00C4FF',
     explorerUrl: 'https://testnet.purrsec.com',
-    rpcUrl: 'https://rpc.hyperliquid-testnet.xyz/evm',
+    rpcUrl: getPrimaryRpcUrl(998),
     usdcAddress: '0x2B3370eE501B4a559b57D449569354196457D8Ab',
     isNativeArc: false,
     cctpDomain: 19,
@@ -181,7 +191,7 @@ export const SUPPORTED_CHAINS: ChainMetadata[] = [
     iconUrl: 'https://icons.llamao.fi/icons/chains/rsz_monad.jpg',
     color: '#836EF9',
     explorerUrl: 'https://testnet.monadexplorer.com',
-    rpcUrl: 'https://testnet-rpc.monad.xyz',
+    rpcUrl: getPrimaryRpcUrl(10143),
     usdcAddress: '0x534b2f3A21130d7a60830c2Df862319e593943A3',
     isNativeArc: false,
     cctpDomain: 15, // Corrected from 12 to 15
@@ -194,7 +204,7 @@ export const SUPPORTED_CHAINS: ChainMetadata[] = [
     iconUrl: 'https://icons.llamao.fi/icons/chains/rsz_ink.jpg',
     color: '#7C3AED',
     explorerUrl: 'https://explorer-sepolia.inkonchain.com',
-    rpcUrl: 'https://rpc-gel-sepolia.inkonchain.com',
+    rpcUrl: getPrimaryRpcUrl(763373),
     usdcAddress: '0xFabab97dCE620294D2B0b0e46C68964e326300Ac',
     isNativeArc: false,
     cctpDomain: 21,
@@ -207,7 +217,7 @@ export const SUPPORTED_CHAINS: ChainMetadata[] = [
     iconUrl: 'https://icons.llamao.fi/icons/chains/rsz_sei.jpg',
     color: '#9C1C44',
     explorerUrl: 'https://seitrace.com/?chain=atlantic-2',
-    rpcUrl: 'https://evm-rpc-testnet.sei-apis.com',
+    rpcUrl: getPrimaryRpcUrl(1328),
     usdcAddress: '0x4fCF1784B31630811181f670Aea7A7bEF803eaED', // Corrected
     isNativeArc: false,
     cctpDomain: 16,
@@ -220,7 +230,7 @@ export const SUPPORTED_CHAINS: ChainMetadata[] = [
     iconUrl: 'https://icons.llamao.fi/icons/chains/rsz_worldchain.png',
     color: '#191C1F',
     explorerUrl: 'https://worldchain-sepolia.explorer.alchemy.com',
-    rpcUrl: 'https://worldchain-sepolia.g.alchemy.com/public',
+    rpcUrl: getPrimaryRpcUrl(4801),
     usdcAddress: '0x66145f38cBAC35Ca6F1Dfb4914dF98F1614aeA88', // Corrected
     isNativeArc: false,
     cctpDomain: 14,
@@ -233,7 +243,7 @@ export const SUPPORTED_CHAINS: ChainMetadata[] = [
     iconUrl: 'https://icons.llamao.fi/icons/chains/rsz_pharos.jpg',
     color: '#E8B84B',
     explorerUrl: 'https://atlantic.pharosscan.xyz',
-    rpcUrl: 'https://atlantic.dplabs-internal.com',
+    rpcUrl: getPrimaryRpcUrl(688689),
     usdcAddress: '0xcfc8330f4bcab529c625d12781b1c19466a9fc8b', // Corrected to active address
     isNativeArc: false,
     cctpDomain: 31, // Corrected to 31
@@ -246,7 +256,7 @@ export const SUPPORTED_CHAINS: ChainMetadata[] = [
     iconUrl: 'https://coin-images.coingecko.com/coins/images/30032/large/open-campus.png',
     color: '#D97706',
     explorerUrl: 'https://opencampus-codex.blockscout.com',
-    rpcUrl: 'https://rpc.open-campus-codex.gelato.digital',
+    rpcUrl: getPrimaryRpcUrl(656476),
     usdcAddress: '0x6d7f141b6819C2c9CC2f818e6ad549E7Ca090F8f',
     isNativeArc: false,
     cctpDomain: 12,
@@ -259,7 +269,7 @@ export const SUPPORTED_CHAINS: ChainMetadata[] = [
     iconUrl: 'https://layeredge.io/favicon.ico',
     color: '#3B82F6',
     explorerUrl: 'https://testnet-explorer.layeredge.io',
-    rpcUrl: 'https://testnet-rpc.layeredge.io',
+    rpcUrl: getPrimaryRpcUrl(3456),
     usdcAddress: '0x2d9F7CAD728051AA35Ecdc472a14cf8cDF5CFD6B',
     isNativeArc: false,
     cctpDomain: 28,
@@ -272,7 +282,7 @@ export const SUPPORTED_CHAINS: ChainMetadata[] = [
     iconUrl: 'https://icons.llamao.fi/icons/chains/rsz_injective.jpg',
     color: '#06B6D4',
     explorerUrl: 'https://testnet.explorer.inevm.com',
-    rpcUrl: 'https://k8s.testnet.json-rpc.injective.network',
+    rpcUrl: getPrimaryRpcUrl(1439),
     usdcAddress: '0x0C382e685bbeeFE5d3d9C29e29E341fEE8E84C5d',
     isNativeArc: false,
     cctpDomain: 29,
@@ -285,10 +295,14 @@ export const SUPPORTED_CHAINS: ChainMetadata[] = [
     iconUrl: 'https://icons.llamao.fi/icons/chains/rsz_morph.jpg',
     color: '#10B981',
     explorerUrl: 'https://explorer-holesky.morphl2.io',
-    rpcUrl: 'https://rpc-holesky.morphl2.io',
+    rpcUrl: getPrimaryRpcUrl(2810),
     usdcAddress: '0xCfb1186F4e93D60E60a8bDd997427D1F33bc372B',
     isNativeArc: false,
     cctpDomain: 30,
+    // Every published Morph Holesky RPC (rpc-holesky.morphl2.io and the QuickNode mirror)
+    // is currently unreachable, so balances and burns cannot work. Hidden until an
+    // endpoint comes back rather than letting users start a transfer that must fail.
+    isComingSoon: true,
   },
   {
     id: 98867,
@@ -298,7 +312,7 @@ export const SUPPORTED_CHAINS: ChainMetadata[] = [
     iconUrl: 'https://icons.llamao.fi/icons/chains/rsz_plume.jpg',
     color: '#EC4899',
     explorerUrl: 'https://testnet-explorer.plume.org',
-    rpcUrl: 'https://testnet-rpc.plume.org',
+    rpcUrl: getPrimaryRpcUrl(98867),
     usdcAddress: '0xcB5f30e335672893c7eb944B374c196392C19D18',
     isNativeArc: false,
     cctpDomain: 22,
@@ -311,7 +325,7 @@ export const SUPPORTED_CHAINS: ChainMetadata[] = [
     iconUrl: 'https://icons.llamao.fi/icons/chains/rsz_xdc.jpg',
     color: '#1E3A8A',
     explorerUrl: 'https://apothem.xdcscan.io',
-    rpcUrl: 'https://rpc.apothem.network',
+    rpcUrl: getPrimaryRpcUrl(51),
     usdcAddress: '0xb5AB69F7bBada22B28e79C8FFAECe55eF1c771D4',
     isNativeArc: false,
     cctpDomain: 18,
@@ -326,7 +340,7 @@ export const SUPPORTED_CHAINS: ChainMetadata[] = [
     iconUrl: 'https://icons.llamao.fi/icons/chains/rsz_solana.jpg',
     color: '#9945FF',
     explorerUrl: 'https://solscan.io/?cluster=devnet',
-    rpcUrl: 'https://api.devnet.solana.com',
+    rpcUrl: getSolanaRpcUrl(),
     usdcAddress: '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU', // Solana Devnet USDC mint
     isNativeArc: false,
     cctpDomain: 5,

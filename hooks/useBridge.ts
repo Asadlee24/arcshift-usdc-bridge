@@ -15,6 +15,7 @@ import { Connection, PublicKey as SolanaPublicKey } from '@solana/web3.js';
 // Note: createSolanaAdapterFromProvider is loaded dynamically in the bridge function to avoid SSR issues
 import { createViemAdapterFromProvider } from '@circle-fin/adapter-viem-v2';
 import { appKit } from '../lib/appKit';
+import { getSolanaRpcUrl } from '../lib/rpcEndpoints';
 
 // Helper to build a Solana provider compliant with Circle's SolanaAdapter Zod validation requirements
 function buildSolanaProviderAdapter(solanaWallet: any) {
@@ -229,7 +230,7 @@ export class AttestationTimeoutError extends Error {
 async function retrieveAttestation(
   transactionHash: string,
   fromDomain: number,
-  maxAttempts = 20
+  maxAttempts = 60
 ): Promise<AttestationMessage> {
   const url = `https://iris-api-sandbox.circle.com/v2/messages/${fromDomain}?transactionHash=${transactionHash}`;
 
@@ -268,9 +269,13 @@ async function retrieveAttestation(
       console.warn(`Attestation poll attempt ${attempt + 1} failed:`, error);
     }
 
-    // Exponential backoff capped at 30s, with jitter to avoid synchronised retries.
-    const backoff = Math.min(2000 * 2 ** attempt, 30000);
-    const jitter = Math.random() * 1000;
+    // Gentle backoff: 1s, 1.5s, 2.25s ... capped at 6s, with jitter to avoid synchronised
+    // retries. The cap matters for perceived speed — the previous curve (2s doubling to a
+    // 30s ceiling) meant an attestation that completed at ~20s often went unnoticed until
+    // ~45s because the poller was asleep. Attestations typically land in 15s-2min, so a 6s
+    // ceiling keeps latency low while staying well within Iris rate limits.
+    const backoff = Math.min(1000 * 1.5 ** attempt, 6000);
+    const jitter = Math.random() * 500;
     await new Promise((resolve) => setTimeout(resolve, backoff + jitter));
   }
 
@@ -571,7 +576,10 @@ export function useBridge() {
           const solanaAdapters = await import('@circle-fin/adapter-solana');
           sourceAdapter = await solanaAdapters.createSolanaAdapterFromProvider({
             provider: solanaProviderForAdapter as any,
-            connection: new Connection(fromChain.rpcUrl, 'confirmed'),
+            // 'confirmed' (not 'finalized') keeps the burn responsive: finalization on Solana
+            // adds ~13s per confirmation wait. The registry URL honours NEXT_PUBLIC_SOLANA_RPC,
+            // since the shared public devnet node rate-limits and stalls bridge submissions.
+            connection: new Connection(fromChain.rpcUrl || getSolanaRpcUrl(), 'confirmed'),
           });
         } else {
           if (!window.ethereum) {
@@ -596,7 +604,7 @@ export function useBridge() {
           const solanaAdapters = await import('@circle-fin/adapter-solana');
           destAdapter = await solanaAdapters.createSolanaAdapterFromProvider({
             provider: solanaProviderForAdapter as any,
-            connection: new Connection(toChain.rpcUrl, 'confirmed'),
+            connection: new Connection(toChain.rpcUrl || getSolanaRpcUrl(), 'confirmed'),
           });
         } else {
           if (!window.ethereum) {

@@ -7,6 +7,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronRight, Check, Search } from 'lucide-react';
 import { SUPPORTED_CHAINS, ChainMetadata } from '../../constants/chains';
+import { measureChainLatency } from '../../lib/rpcClient';
 
 interface ChainPickerProps {
   selectedChain: ChainMetadata;
@@ -45,31 +46,22 @@ export default function ChainPicker({
     if (!isOpen) return;
 
     const activeChains = SUPPORTED_CHAINS.filter(c => !c.isComingSoon && !c.isSolana);
-    
+
+    // Probing stops when the picker closes, so a stale batch can't overwrite fresh readings.
+    let isCancelled = false;
+
+    // measureChainLatency goes through the shared client, which honours the endpoint
+    // registry and the /api/rpc proxy. Probing chain.rpcUrl directly (as this did before)
+    // meant Arc was reported as "off" purely because the browser blocked it on CORS, even
+    // though the node was healthy.
     activeChains.forEach(async (chain) => {
-      const start = Date.now();
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 2500); // 2.5s limit
-
-        const res = await fetch(chain.rpcUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ jsonrpc: '2.0', method: 'eth_blockNumber', params: [], id: 99 }),
-          signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-
-        if (res.ok) {
-          const duration = Date.now() - start;
-          setLatencies(prev => ({ ...prev, [chain.id]: duration }));
-        } else {
-          setLatencies(prev => ({ ...prev, [chain.id]: -1 }));
-        }
-      } catch (err) {
-        setLatencies(prev => ({ ...prev, [chain.id]: -1 }));
+      const latency = await measureChainLatency(chain.id);
+      if (!isCancelled) {
+        setLatencies(prev => ({ ...prev, [chain.id]: latency }));
       }
     });
+
+    return () => { isCancelled = true; };
   }, [isOpen]);
 
   const handleSelect = (chain: ChainMetadata) => {

@@ -13,6 +13,8 @@ import { config } from '../lib/wagmi';
 import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react';
 import { PhantomWalletAdapter } from '@solana/wallet-adapter-phantom';
 import { SolflareWalletAdapter } from '@solana/wallet-adapter-solflare';
+import { getSolanaRpcUrl } from '../lib/rpcEndpoints';
+
 
 // Import RainbowKit CSS styles for the modal UI
 import '@rainbow-me/rainbowkit/styles.css';
@@ -28,8 +30,11 @@ export function Providers({ children }: { children: React.ReactNode }) {
     },
   }));
 
-  // Configure Solana Devnet Connection and Wallets
-  const endpoint = useMemo(() => 'https://api.devnet.solana.com', []);
+  // Configure Solana Devnet Connection and Wallets.
+  // Sourced from the central registry so a NEXT_PUBLIC_SOLANA_RPC override applies here too —
+  // the public devnet endpoint is aggressively rate-limited, which made Solana reads and
+  // bridge submissions intermittently fail.
+  const endpoint = useMemo(() => getSolanaRpcUrl(), []);
   const wallets = useMemo(
     () => [
       new PhantomWalletAdapter(),

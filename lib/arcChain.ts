@@ -11,10 +11,17 @@ export const arcTestnet = defineChain({
     decimals: 18, // Native Gas Token USDC has 18 decimals on Arc Network
   },
   rpcUrls: {
+    // Intentionally the real upstream URL, NOT our /api/rpc proxy.
+    //
+    // This value is what gets handed to the wallet via wallet_addEthereumChain when a user
+    // adds/switches to Arc. MetaMask issues those requests from its own extension process,
+    // where CORS does not apply, and it cannot resolve a relative path like /api/rpc/5042002.
+    // The app's own browser-side reads use the proxy instead — see lib/rpcEndpoints.ts.
     default: {
       http: ['https://rpc.testnet.arc.network'],
     },
   },
+
   blockExplorers: {
     default: {
       name: 'ArcScan',

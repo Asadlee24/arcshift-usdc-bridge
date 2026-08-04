@@ -13,6 +13,7 @@ import { playClickSound } from '../../lib/audio';
 // Solana Wallet & Web3 Imports
 import { useWallet } from '@solana/wallet-adapter-react';
 import { Connection, PublicKey as SolanaPublicKey } from '@solana/web3.js';
+import { readErc20Balance } from '../../lib/rpcClient';
 
 interface UnifiedPortfolioDrawerProps {
   isOpen: boolean;
@@ -27,38 +28,8 @@ interface ChainBalanceState {
   isError: boolean;
 }
 
-const BACKUP_RPCS: Record<number, string[]> = {
-  5042002: ['https://rpc.testnet.arc.network'],
-  11155111: [
-    'https://ethereum-sepolia-rpc.publicnode.com',
-    'https://eth-sepolia.public.blastapi.io',
-    'https://rpc.sepolia.org'
-  ],
-  84532: [
-    'https://base-sepolia-rpc.publicnode.com',
-    'https://sepolia.base.org'
-  ],
-  421614: [
-    'https://arbitrum-sepolia-rpc.publicnode.com',
-    'https://sepolia-rollup.arbitrum.io/rpc'
-  ],
-  43113: [
-    'https://api.avax-test.network/ext/bc/C/rpc',
-    'https://avalanche-fuji-c-chain-rpc.publicnode.com'
-  ],
-  11155420: [
-    'https://sepolia.optimism.io',
-    'https://optimism-sepolia-rpc.publicnode.com'
-  ],
-  59141: [
-    'https://rpc.sepolia.linea.build',
-    'https://linea-sepolia-rpc.publicnode.com'
-  ],
-  80002: [
-    'https://rpc-amoy.polygon.technology',
-    'https://polygon-amoy-bor-rpc.publicnode.com'
-  ]
-};
+// USDC is 6-decimal on every chain in this app.
+const USDC_DECIMALS = 6;
 
 async function fetchSingleChainBalance(chain: ChainMetadata, userAddress: string, solanaAddress?: string): Promise<number> {
   if (chain.isComingSoon) return 0;
@@ -85,43 +56,12 @@ async function fetchSingleChainBalance(chain: ChainMetadata, userAddress: string
   
   if (!userAddress) return 0;
 
-  // balanceOf(address) method selector is 0x70a08231
-  const cleanAddress = userAddress.toLowerCase().replace('0x', '');
-  const data = `0x70a08231000000000000000000000000${cleanAddress}`;
-
-  const rpcs = [
-    chain.rpcUrl,
-    ...(BACKUP_RPCS[chain.id] || [])
-  ];
-
-  for (const rpc of rpcs) {
-    try {
-      const response = await fetch(rpc, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          jsonrpc: '2.0',
-          method: 'eth_call',
-          params: [{ to: chain.usdcAddress, data }, 'latest'],
-          id: 1
-        }),
-        // Add a strict timeout to avoid hang-ups
-        signal: AbortSignal.timeout(5000)
-      });
-
-      if (response.ok) {
-        const json = await response.json();
-        if (json?.result && json.result !== '0x') {
-          const rawBalance = BigInt(json.result);
-          const finalBalance = Number(rawBalance) / 1_000_000;
-          return finalBalance;
-        }
-      }
-    } catch (e) {
-      console.warn(`Portfolio failed to fetch balance on ${chain.name} via ${rpc}:`, e);
-    }
-  }
-  return 0;
+  // Endpoint selection, failover, and timeouts come from lib/rpcClient. This previously kept
+  // its own BACKUP_RPCS copy which listed dead endpoints (Blast 403, rpc.sepolia.org 404,
+  // rpc-amoy.polygon.technology unreachable) and hit Arc's CORS-blocked RPC directly, so the
+  // Arc row could never load and several others burned a full timeout first.
+  const balance = await readErc20Balance(chain.id, chain.usdcAddress, userAddress, USDC_DECIMALS);
+  return balance ?? 0;
 }
 
 export default function UnifiedPortfolioDrawer({ isOpen, onClose, theme = 'light' }: UnifiedPortfolioDrawerProps) {

@@ -27,6 +27,10 @@ import { addTransaction } from '../../hooks/useTransactionHistory';
 import { readContract, writeContract, waitForTransactionReceipt, getAccount, switchChain } from '@wagmi/core';
 import { config } from '../../lib/wagmi';
 import { parseUnits } from 'viem';
+import { readErc20Balance } from '../../lib/rpcClient';
+
+// Arc Testnet. The swap panel is Arc-only, so every balance read here targets this chain.
+const ARC_CHAIN_ID = 5042002;
 
 interface BridgeCardProps {
   theme?: 'dark' | 'light';
@@ -36,10 +40,10 @@ export default function BridgeCard({ theme = 'light' }: BridgeCardProps) {
   const { isConnected, address } = useAccount();
   const solanaWallet = useWallet();
 
-  // Core State (Arc is default TO chain, Chain ID 5042002)
-  // Base Sepolia is the default source. It was Ethereum Sepolia, which is now marked
-  // isComingSoon and therefore absent from the picker — leaving it as the default meant the
-  // app opened on a route it would not let you select.
+  // Core State (Arc is default TO chain, Chain ID 5042002).
+  // Base Sepolia is the default source. Ethereum Sepolia is now enabled and selectable, so
+  // either would work; Base Sepolia is kept as the default because its faucet is the easiest
+  // for testers to top up from.
   const [fromChain, setFromChain] = useState(() => getChainById(84532)!); // Base Sepolia
   const [toChain, setToChain] = useState(() => getChainById(5042002)!); // Arc Testnet
 
@@ -109,34 +113,20 @@ export default function BridgeCard({ theme = 'light' }: BridgeCardProps) {
     return 1;
   };
 
-  // Helper to query token balance directly from Arc testnet RPC
+  // Reads a token balance on Arc via the shared RPC client.
+  //
+  // This is the call that produced the reported "Read contract failed: HTTP request failed /
+  // Details: Failed to fetch" for balanceOf on 0x36000...0000: it fetched
+  // https://rpc.testnet.arc.network straight from the browser, and that endpoint sends no
+  // Access-Control-Allow-Origin header, so the request never left the page. readErc20Balance
+  // routes Arc through /api/rpc/5042002 instead, where no CORS policy applies.
   async function queryTokenBalance(tokenAddress: string, userAddress: string, decimals: number): Promise<string> {
     if (!userAddress) return '0.00';
-    try {
-      const cleanAddress = userAddress.toLowerCase().replace('0x', '');
-      const data = `0x70a08231000000000000000000000000${cleanAddress}`;
-      const response = await fetch('https://rpc.testnet.arc.network', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          jsonrpc: '2.0',
-          method: 'eth_call',
-          params: [{ to: tokenAddress, data }, 'latest'],
-          id: 1
-        })
-      });
-      if (response.ok) {
-        const json = await response.json();
-        if (json?.result && json.result !== '0x') {
-          const rawBalance = BigInt(json.result);
-          const finalBalance = Number(rawBalance) / Math.pow(10, decimals);
-          return finalBalance.toFixed(decimals === 6 ? 2 : 4);
-        }
-      }
-    } catch (e) {
-      console.warn('Failed to fetch balance:', e);
-    }
-    return '0.00';
+
+    const balance = await readErc20Balance(ARC_CHAIN_ID, tokenAddress, userAddress, decimals);
+    if (balance === null) return '0.00';
+
+    return balance.toFixed(decimals === 6 ? 2 : 4);
   }
 
   // Load balances of swap tokens in background
@@ -144,8 +134,12 @@ export default function BridgeCard({ theme = 'light' }: BridgeCardProps) {
     if (!address) return;
     setIsLoadingBalances(true);
     try {
-      const sellBal = await queryTokenBalance(sellToken.address, address, sellToken.decimals);
-      const buyBal = await queryTokenBalance(buyToken.address, address, buyToken.decimals);
+      // Both sides are fetched concurrently. Awaiting them in sequence doubled the time the
+      // swap panel sat on "loading" for no reason — the two reads are independent.
+      const [sellBal, buyBal] = await Promise.all([
+        queryTokenBalance(sellToken.address, address, sellToken.decimals),
+        queryTokenBalance(buyToken.address, address, buyToken.decimals),
+      ]);
 
       const localSellOffset = parseFloat(localStorage.getItem(`arc_credit_${sellToken.symbol}_${address}`) || '0');
       const localBuyOffset = parseFloat(localStorage.getItem(`arc_credit_${buyToken.symbol}_${address}`) || '0');
@@ -425,11 +419,12 @@ export default function BridgeCard({ theme = 'light' }: BridgeCardProps) {
       if (fromParam) {
         let chainId = 84532;
         if (fromParam === 'base') chainId = 84532;
+        else if (fromParam === 'ethereum' || fromParam === 'sepolia') chainId = 11155111;
         else if (fromParam === 'arbitrum') chainId = 421614;
         else if (fromParam === 'optimism') chainId = 11155420;
         else if (fromParam === 'avalanche') chainId = 43113;
 
-        // Ignore ?from= values pointing at unsupported chains (e.g. ethereum) rather than
+        // Ignore ?from= values pointing at chains still flagged isComingSoon rather than
         // deep-linking the user into a route that cannot complete.
         const chain = getChainById(chainId);
         if (chain && !chain.isComingSoon) {

@@ -4,6 +4,9 @@ import { getChainById } from '../constants/chains';
 import { formatUnits } from 'viem';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { Connection, PublicKey } from '@solana/web3.js';
+import { readErc20Balance } from '../lib/rpcClient';
+import { getSolanaRpcUrl } from '../lib/rpcEndpoints';
+
 
 // Standard ERC-20 Minimal ABI containing balanceOf
 const ERC20_ABI = [
@@ -27,38 +30,11 @@ const SOLANA_ASSOCIATED_TOKEN_PROGRAM_ID = 'ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTN
 const BALANCE_POLL_INTERVAL_MS = 15000;
 const REFRESH_EVENT = 'bridge-success-refresh';
 
-const BACKUP_RPCS: Record<number, string[]> = {
-    5042002: ['https://rpc.testnet.arc.network'],
-    11155111: [
-        'https://ethereum-sepolia-rpc.publicnode.com',
-        'https://eth-sepolia.public.blastapi.io',
-        'https://rpc.sepolia.org'
-    ],
-    84532: [
-        'https://base-sepolia-rpc.publicnode.com',
-        'https://sepolia.base.org'
-    ],
-    421614: [
-        'https://arbitrum-sepolia-rpc.publicnode.com',
-        'https://sepolia-rollup.arbitrum.io/rpc'
-    ],
-    43113: [
-        'https://api.avax-test.network/ext/bc/C/rpc',
-        'https://avalanche-fuji-c-chain-rpc.publicnode.com'
-    ],
-    11155420: [
-        'https://sepolia.optimism.io',
-        'https://optimism-sepolia-rpc.publicnode.com'
-    ],
-    59141: [
-        'https://rpc.sepolia.linea.build',
-        'https://linea-sepolia-rpc.publicnode.com'
-    ],
-    80002: [
-        'https://rpc-amoy.polygon.technology',
-        'https://polygon-amoy-bor-rpc.publicnode.com'
-    ]
-};
+// The per-chain BACKUP_RPCS table that used to live here has moved to lib/rpcEndpoints.ts.
+// It listed endpoints that are now dead (eth-sepolia.public.blastapi.io -> 403,
+// rpc.sepolia.org -> 404, rpc-amoy.polygon.technology -> unreachable) and called Arc's
+// CORS-blocked RPC directly from the browser, so Arc balance reads could never succeed.
+
 
 /**
  * Derives the Associated Token Account address for a given owner/mint pair.
@@ -75,42 +51,22 @@ function deriveSolanaATA(owner: PublicKey, mint: PublicKey): PublicKey {
     return ata;
 }
 
-async function fetchUSDCBalanceDirectly(chainId: number, userAddress: string, usdcAddress: string): Promise<number | null> {
-    const chainMeta = getChainById(chainId);
-    const rpcs = [
-        ...(chainMeta?.rpcUrl ? [chainMeta.rpcUrl] : []),
-        ...(BACKUP_RPCS[chainId] || [])
-    ];
-    // Method selector for balanceOf(address) is 0x70a08231
-    const cleanAddress = userAddress.toLowerCase().replace('0x', '');
-    const data = `0x70a08231000000000000000000000000${cleanAddress}`;
-
-    for (const rpc of rpcs) {
-        try {
-            const response = await fetch(rpc, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    jsonrpc: '2.0',
-                    method: 'eth_call',
-                    params: [{ to: usdcAddress, data }, 'latest'],
-                    id: 1
-                })
-            });
-
-            if (response.ok) {
-                const json = await response.json();
-                if (json?.result && json.result !== '0x') {
-                    const rawBalance = BigInt(json.result);
-                    return Number(formatUnits(rawBalance, USDC_DECIMALS));
-                }
-            }
-        } catch (e) {
-            console.warn(`Direct balance fetch failed for chain ${chainId} via ${rpc}:`, e);
-        }
-    }
-    return null;
+/**
+ * Reads a USDC balance straight from RPC, bypassing wagmi.
+ *
+ * Delegates endpoint selection, failover, and timeouts to lib/rpcClient, which routes
+ * CORS-blocked chains (Arc) through the /api/rpc proxy. The previous inline implementation
+ * had no timeout, so a single unresponsive node would leave the balance stuck on "..."
+ * indefinitely.
+ */
+async function fetchUSDCBalanceDirectly(
+    chainId: number,
+    userAddress: string,
+    usdcAddress: string
+): Promise<number | null> {
+    return readErc20Balance(chainId, usdcAddress, userAddress, USDC_DECIMALS);
 }
+
 
 export function useUSDCBalance(chainId: number) {
     const { address, isConnected } = useAccount();
@@ -147,7 +103,8 @@ export function useUSDCBalance(chainId: number) {
     const fetchSolanaBalance = useCallback(async (): Promise<number | null> => {
         if (!publicKey || !usdcAddress) return null;
         try {
-            const connection = new Connection(rpcUrl || 'https://api.devnet.solana.com', 'confirmed');
+            const connection = new Connection(rpcUrl || getSolanaRpcUrl(), 'confirmed');
+
             const ata = deriveSolanaATA(publicKey, new PublicKey(usdcAddress));
             const response = await connection.getParsedAccountInfo(ata);
             if (!response.value) return 0;
