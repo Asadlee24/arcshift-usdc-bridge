@@ -392,6 +392,20 @@ export function useBridge() {
     };
   }, []);
 
+  // Wallet disconnect listener (Issue #14)
+  const accountInfo = getAccount(config);
+  useEffect(() => {
+    if (!accountInfo.isConnected && !solanaWallet.connected && status === 'bridging') {
+      setStatus('error');
+      setError('Wallet disconnected during bridging operation.');
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (attestTimerRef.current) clearInterval(attestTimerRef.current);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('bridge-state-change', { detail: { isBridging: false } }));
+      }
+    }
+  }, [accountInfo.isConnected, solanaWallet.connected, status]);
+
   const reset = useCallback(() => {
     setStatus('idle');
     setError(null);
@@ -825,7 +839,7 @@ export function useBridge() {
       ]);
 
       // Spender and Messengers — same TokenMessengerV2 across all CCTP-supported testnets
-      const tokenMessenger = '0x8fe6b999dc680ccfdd5bf7eb0974218be2542daa';
+      const tokenMessenger = '0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA';
       
       const destinationTransmitter = getMessageTransmitterAddress();
 
@@ -923,7 +937,7 @@ export function useBridge() {
           args: [tokenMessenger as `0x${string}`, amountInUnits],
           chainId: fromChain.id as any,
           ...(isOpStack ? {
-            gas: BigInt(150000),
+            gas: BigInt(180000),
             gasPrice: currentGasPrice,
             type: 'legacy'
           } : {})
@@ -964,7 +978,7 @@ export function useBridge() {
           ],
           chainId: fromChain.id as any,
           ...(isOpStack ? {
-            gas: BigInt(300000),
+            gas: BigInt(360000),
             gasPrice: currentGasPrice,
             type: 'legacy'
           } : {})

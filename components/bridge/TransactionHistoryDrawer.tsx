@@ -75,7 +75,7 @@ export default function TransactionHistoryDrawer({
 
   const getMessageTransmitterAddress = (chainId: number): string => {
     // Always return the custom MessageTransmitter V2 address deployed by Arc Network across all supported testnets.
-    // This is required because we burn using Arc's custom TokenMessenger (0x8fe6b999dc680ccfdd5bf7eb0974218be2542daa).
+    // This is required because we burn using Arc's custom TokenMessenger (0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA).
     return '0xe737e5cebeeba77efe34d4aa090756590b1ce275';
   };
 

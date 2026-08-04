@@ -348,8 +348,8 @@ export default function BridgeCard({ theme = 'light' }: BridgeCardProps) {
       // Wait for the transaction to be mined
       await waitForTransactionReceipt(config, { hash: txHash, chainId: 5042002 });
 
-      // Generate a mock destination transaction hash for the swap mint
-      const dstHash = '0x' + Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
+      // Use real on-chain transaction hash for the escrow deposit (simulation mode)
+      const dstHash = txHash;
 
       setSwapTxHash(txHash);
       setSwapDestTxHash(dstHash);
@@ -359,8 +359,9 @@ export default function BridgeCard({ theme = 'light' }: BridgeCardProps) {
         if (s.name === 'mint') return {
           ...s,
           status: 'done',
-          txHash: dstHash,
-          explorerUrl: `https://testnet.arcscan.app/tx/${dstHash}`
+          label: 'Escrow Confirmed (Simulation)',
+          txHash: txHash.substring(0, 10) + '...',
+          explorerUrl: `https://testnet.arcscan.app/tx/${txHash}`
         };
         return s;
       }));
@@ -667,8 +668,16 @@ export default function BridgeCard({ theme = 'light' }: BridgeCardProps) {
                   {activeTab !== 'swap' && (
                     <span className="text-[8px] font-black bg-[#10B981]/20 text-[#10B981] px-1 rounded-full">NEW</span>
                   )}
-                </button>
               </div>
+
+              {activeTab === 'swap' && (
+                <div className="mb-3 p-2.5 rounded-[12px] bg-amber-500/10 border border-amber-500/25 flex items-start gap-2 text-left">
+                  <Info className="h-4 w-4 text-amber-500 flex-shrink-0 mt-0.5" />
+                  <p className="text-[11px] font-semibold text-amber-500 leading-tight">
+                    <strong>SIMULATION MODE:</strong> Swaps transfer tokens to the Arc Testnet Escrow contract (<code className="font-mono text-[10px]">0x8676...a9f8</code>). Secondary token ledger balances are simulated for testnet preview.
+                  </p>
+                </div>
+              )}
 
               {/* Stacked Sell / Buy boxes with overlapping swap arrow button */}
               <div className="relative flex flex-col gap-0.5 mb-4">
