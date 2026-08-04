@@ -578,31 +578,27 @@ export default function BridgeCard({ theme = 'light' }: BridgeCardProps) {
 
   const usdValue = parseFloat(amount || '0') * 1.0;
 
-  // Theme variable helper mapping
+  // Theme variable helper mapping — gold (#C8922A) is the card chrome accent.
+  // Emerald (#10B981) is reserved for success states and live indicators.
   const isDark = theme === 'dark';
-  // Light values come from the design system in globals.css:
-  //   surface #FFFFFF / sunken #F6F7F9 / hairline #E8E8EC / ink #12141A
-  // Two deliberate choices here:
-  //  1. The card uses .shadow-crisp-lg (many tight low-alpha layers) instead of
-  //     a single large blur. That is what makes a white card read as "crisp"
-  //     rather than floating.
-  //  2. Muted text is #5C6470, not slate-500. slate-500 on white is ~4.0:1 and
-  //     misses WCAG AA for body copy; #5C6470 is ~5.7:1 and passes.
-  const cardBg = isDark ? 'glass-panel-dark text-white shadow-2xl' : 'bg-white/95 backdrop-blur-md shadow-crisp-lg text-[#12141A]';
-  const cardBorder = isDark ? 'border-[#10B981]/25 hover:border-[#10B981]/50 transition-all duration-300' : 'border-[#E8E8EC] hover:border-[#10B981]/30 transition-all duration-300';
+  const cardBg = isDark ? 'glass-panel-dark text-[#F5F0E8]' : 'bg-white/95 backdrop-blur-md text-[#12141A]';
+  const cardBorder = isDark
+    ? 'border-[#C8922A]/20 hover:border-[#C8922A]/40 transition-all duration-300'
+    : 'border-[#C8922A]/15 hover:border-[#C8922A]/35 transition-all duration-300';
+  const cardGlow = isDark ? 'glow-card-gold' : 'glow-card-gold';
   const inputBg = isDark
-    ? 'bg-[#080D1A]/90 border-[#1E293B] focus-within:border-[#10B981]/60 focus-within:bg-[#0C1220] transition-colors duration-200'
-    : 'bg-[#F6F7F9] border-[#E8E8EC] focus-within:border-[#10B981]/50 focus-within:bg-white transition-colors duration-200';
-  const tabBg = isDark ? 'bg-[#131B2E]' : 'bg-[#F1F2F5]';
+    ? 'bg-[#0F0E0B]/90 border-[#2A2415] focus-within:border-[#C8922A]/50 focus-within:bg-[#141209] transition-colors duration-200'
+    : 'bg-[#F6F5F1] border-[#E8E6DF] focus-within:border-[#C8922A]/45 focus-within:bg-white transition-colors duration-200';
+  const tabBg = isDark ? 'bg-[#1A170D]' : 'bg-[#F0EEE9]';
   const activeTabBg = isDark
-    ? 'bg-[#0F172A] text-white'
-    : 'bg-white text-[#12141A] shadow-crisp';
-  const textMuted = isDark ? 'text-slate-400' : 'text-[#5C6470]';
-  const textTitleMuted = isDark ? 'text-slate-500' : 'text-[#8A919E]';
-  const textPrimary = isDark ? 'text-white' : 'text-[#12141A]';
+    ? 'bg-[#2A220E] text-[#D4A043]'
+    : 'bg-white text-[#C8922A] shadow-crisp';
+  const textMuted = isDark ? 'text-[#A09880]' : 'text-[#5C6470]';
+  const textTitleMuted = isDark ? 'text-[#6B6150]' : 'text-[#8A919E]';
+  const textPrimary = isDark ? 'text-[#F5F0E8]' : 'text-[#12141A]';
   const trendingPill = isDark
-    ? 'bg-[#131B2E] border-[#1E293B] text-slate-300 hover:border-slate-600'
-    : 'bg-white border-[#E8E8EC] text-[#12141A] hover:border-[#10B981]/40 shadow-crisp transition-colors duration-200';
+    ? 'bg-[#1A170D] border-[#2A2415] text-[#A09880] hover:border-[#C8922A]/40'
+    : 'bg-white border-[#E8E6DF] text-[#12141A] hover:border-[#C8922A]/35 shadow-crisp transition-colors duration-200';
 
   const isFormVisible = status !== 'bridging' && status !== 'success' && !isSwapping && !swapSuccess;
   const hasValidAmount = !amountError && amount !== '' && parseFloat(amount) > 0;
@@ -610,8 +606,8 @@ export default function BridgeCard({ theme = 'light' }: BridgeCardProps) {
   return (
     <div className="w-full max-w-[500px] mx-auto select-none px-4 sm:px-0">
 
-      {/* Dynamic Card with shadow-relay-card */}
-      <div className={`w-full ${cardBg} border ${cardBorder} rounded-[24px] p-6 relative shadow-relay-card transition-all duration-300 hover:shadow-2xl`}>
+      {/* Dynamic Card with gold glow */}
+      <div className={`w-full ${cardBg} ${cardGlow} border ${cardBorder} rounded-[24px] p-6 relative transition-all duration-300`}>
 
         <AnimatePresence mode="wait">
 

@@ -115,11 +115,10 @@ export default function Home() {
   };
 
   const isDark = theme === 'dark';
-  // Light mode uses .arc-canvas (hairline grid + soft brand washes, defined in
-  // globals.css) rather than a flat fill, so the page has texture behind the
-  // white cards instead of white-on-white.
+  // Dark mode uses warm dark #0B0A07 (gold identity). Light mode uses the
+  // arc-canvas class (gold-tinted grid + soft washes, defined in globals.css).
   const pageBg = isDark
-    ? 'bg-[#070B13] text-white'
+    ? 'bg-[#0B0A07] text-[#F5F0E8]'
     : 'arc-canvas text-[#12141A]';
 
   if (isWidgetMode) {

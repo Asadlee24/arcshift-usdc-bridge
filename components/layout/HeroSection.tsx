@@ -1,16 +1,11 @@
 // components/layout/HeroSection.tsx
-// Hero — light "precision fintech" treatment.
 //
-// Design decisions worth knowing:
-//  - Mixed weight instead of uniform font-black. The emphasis line carries the
-//    weight; the rest sits at 500-600. Uniform black at display size reads as
-//    shouting and is the single most common "unpolished" tell.
-//  - Optical alignment: the eyebrow and pills are centred on the text block,
-//    not the viewport, so they stay aligned when copy wraps.
-//  - Accent text uses --accent-green-ink (#047857), NOT #10B981. The bright
-//    emerald is ~2.2:1 on white and fails WCAG AA for text; the ink variant is
-//    ~4.8:1 and passes AA at these sizes. The bright value is kept for fills
-//    and glows where contrast rules don't apply.
+// Typographic redesign: Playfair Display (display face) for the headline,
+// DM Sans (body) for supporting text. Gold (#C8922A) replaces emerald as the
+// hero accent — it reads as "stored value" rather than generic DeFi green.
+//
+// Type scale pushed further: 72px on desktop (up from 64px). The amount
+// input elsewhere is the second focal point; the headline is the first.
 
 'use client';
 
@@ -23,107 +18,114 @@ interface HeroSectionProps {
 }
 
 const STATS = [
-  { icon: Zap, label: 'Subsecond finality' },
-  { icon: DollarSign, label: '$0.01 gas' },
-  { icon: Shield, label: 'CCTP secured' },
+  { icon: Zap,        label: 'Subsecond finality' },
+  { icon: DollarSign, label: '$0.01 gas'           },
+  { icon: Shield,     label: 'CCTP secured'        },
 ] as const;
 
 export default function HeroSection({ theme = 'light' }: HeroSectionProps) {
   const isDark = theme === 'dark';
 
-  const headingColor = isDark ? 'text-white' : 'text-[#12141A]';
-  const descColor = isDark ? 'text-slate-400' : 'text-[#5C6470]';
-  const accentColor = isDark ? 'text-[#10B981]' : 'text-[#047857]';
+  // Ink colours
+  const headingColor   = isDark ? 'text-[#F5F0E8]' : 'text-[#12141A]';
+  const descColor      = isDark ? 'text-[#A09880]'  : 'text-[#5C6470]';
+  const goldAccent     = isDark ? '#D4A043'          : '#C8922A';
+  const tealAccent     = isDark ? '#38BDF8'          : '#0C4A6E';
 
-  const eyebrowChrome = isDark
-    ? 'border-[#1E293B] bg-[#0F172A]/80 text-slate-300'
-    : 'border-[#E8E8EC] bg-white/80 text-[#5C6470]';
+  const eyebrowBg   = isDark ? 'bg-[#1A170D] border-[#C8922A]/20 text-[#A09880]' : 'bg-white/90 border-[#C8922A]/20 text-[#5C6470]';
+  const statsBorder = isDark ? 'border-[#C8922A]/12 bg-[#1A170D]/60' : 'border-[#E8E6DF] bg-white/80';
+  const statDivider = isDark ? 'divide-[#C8922A]/10' : 'divide-[#E8E6DF]';
+  const pillBg      = isDark ? 'bg-[#1A170D] border-[#C8922A]/15 text-[#A09880]' : 'bg-white border-[#E8E6DF] text-[#12141A]';
 
-  const pillChrome = isDark
-    ? 'border-[#1E293B] bg-[#0F172A] text-slate-300'
-    : 'border-[#E8E8EC] bg-white text-[#12141A]';
-
-  // One shared spring so every element decelerates identically.
   const ease = [0.16, 1, 0.3, 1] as const;
   const rise = (delay: number) => ({
-    initial: { opacity: 0, y: 12 },
+    initial: { opacity: 0, y: 16 },
     animate: { opacity: 1, y: 0 },
-    transition: { duration: 0.7, delay, ease },
+    transition: { duration: 0.8, delay, ease },
   });
 
   return (
-    <div className="w-full select-none max-w-3xl mx-auto flex flex-col items-center text-center px-4 py-10 sm:py-14">
+    <div className="w-full select-none max-w-3xl mx-auto flex flex-col items-center text-center px-4 py-12 sm:py-16">
 
-      {/* Eyebrow — status, not decoration. Establishes "live system". */}
+      {/* Eyebrow pill — establishes "live system" credibility */}
       <motion.div
         {...rise(0)}
-        className={`inline-flex items-center gap-2 rounded-full border ${eyebrowChrome} px-3 py-1 mb-7 backdrop-blur-sm ${
-          isDark ? '' : 'shadow-crisp'
-        }`}
+        className={`inline-flex items-center gap-2 rounded-full border ${eyebrowBg} px-3.5 py-1.5 mb-8 backdrop-blur-sm shadow-sm`}
       >
         <span className="relative flex h-1.5 w-1.5">
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#10B981] opacity-70" />
-          <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[#10B981]" />
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#C8922A] opacity-60" />
+          <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[#C8922A]" />
         </span>
-        <span className="text-[11px] font-semibold uppercase tracking-[0.14em]">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.16em] font-body">
           Live on Arc Testnet
         </span>
       </motion.div>
 
-      {/* Headline. Weight is carried by line two, not both lines. */}
+      {/* Headline — Playfair Display, mixed weight, gold emphasis */}
       <motion.h1
         {...rise(0.08)}
-        className={`${headingColor} text-[40px] sm:text-[56px] lg:text-[64px] leading-[1.02] tracking-[-0.035em] mb-5`}
+        className={`${headingColor} font-display text-[52px] sm:text-[66px] lg:text-[74px] leading-[1.01] tracking-[-0.03em] mb-6`}
       >
-        <span className="block font-semibold">Bridge USDC natively.</span>
+        {/* Line 1 — lighter weight, ink */}
+        <span className="block" style={{ fontWeight: 700 }}>
+          Bridge USDC natively.
+        </span>
+        {/* Line 2 — heavy, gold gradient. This is the emphasis. */}
         <span
-          className={`block font-bold ${accentColor}`}
-          style={
-            isDark
-              ? undefined
-              : {
-                  // Subtle vertical gradient adds dimension without hurting
-                  // contrast — the darkest stop is the one that matters.
-                  backgroundImage:
-                    'linear-gradient(180deg, #059669 0%, #047857 60%, #036249 100%)',
-                  WebkitBackgroundClip: 'text',
-                  backgroundClip: 'text',
-                  color: 'transparent',
-                }
-          }
+          className="block"
+          style={{
+            fontWeight: 900,
+            backgroundImage: isDark
+              ? `linear-gradient(135deg, ${goldAccent} 0%, #E8B84B 40%, ${tealAccent} 100%)`
+              : `linear-gradient(135deg, #A87520 0%, ${goldAccent} 45%, #8A6510 100%)`,
+            WebkitBackgroundClip: 'text',
+            backgroundClip: 'text',
+            color: 'transparent',
+          }}
         >
           At subsecond speed.
         </span>
       </motion.h1>
 
-      {/* Subheading — measure capped near 62ch for comfortable reading. */}
+      {/* Subheading — DM Sans, measured line length */}
       <motion.p
         {...rise(0.16)}
-        className={`text-[16px] sm:text-[17px] font-normal ${descColor} max-w-[34rem] mb-9 leading-[1.65]`}
+        className={`text-[16px] sm:text-[18px] font-body font-normal ${descColor} max-w-[34rem] mb-10 leading-[1.70]`}
       >
         Move stablecoin liquidity across chains without wrapped assets or
         third-party liquidity pools. Settled by Circle CCTP, with gasless
         minting on Arc.
       </motion.p>
 
-      {/* Stat row — a single grouped surface rather than three floating pills.
-          Grouping reads as one deliberate component instead of scattered tags. */}
+      {/* Stats row */}
       <motion.div
         {...rise(0.24)}
-        className="flex flex-wrap items-center justify-center gap-2 sm:gap-0 sm:divide-x sm:divide-[#E8E8EC] sm:rounded-full sm:border sm:border-[#E8E8EC] sm:bg-white sm:shadow-crisp sm:px-1"
-        style={isDark ? { borderColor: '#1E293B', background: 'transparent' } : undefined}
+        className={`
+          flex flex-wrap items-center justify-center gap-2
+          sm:gap-0 sm:divide-x ${statDivider}
+          sm:rounded-full sm:border ${statsBorder}
+          sm:shadow-sm sm:px-1 backdrop-blur-sm
+        `}
       >
         {STATS.map(({ icon: Icon, label }) => (
           <div
             key={label}
-            className={`flex items-center gap-2 px-4 py-2.5 text-[13px] font-medium transition-colors duration-200 rounded-full border sm:border-0 sm:rounded-none ${pillChrome} sm:bg-transparent`}
+            className={`
+              flex items-center gap-2 px-4 py-2.5
+              text-[13px] font-body font-medium
+              rounded-full border sm:border-0 sm:rounded-none
+              ${pillBg} sm:bg-transparent
+            `}
           >
-            <Icon className={`h-[15px] w-[15px] ${accentColor}`} strokeWidth={2.25} />
+            <Icon
+              className="h-[14px] w-[14px]"
+              style={{ color: goldAccent }}
+              strokeWidth={2.5}
+            />
             <span className="whitespace-nowrap">{label}</span>
           </div>
         ))}
       </motion.div>
-
     </div>
   );
 }

@@ -956,6 +956,9 @@ export function useBridge() {
         explorerUrl: approveHash ? `${fromChain.explorerUrl}/tx/${approveHash}` : undefined
       } : s));
 
+      // Notify 3D arc: approve done, burn starting
+      window.dispatchEvent(new CustomEvent('bridge-step-change', { detail: { step: 'burn' } }));
+
       // ==========================================
       // STEP 2: BURN
       // ==========================================
@@ -1020,6 +1023,9 @@ export function useBridge() {
       // Trigger UI balance updates
       window.dispatchEvent(new Event('bridge-success-refresh'));
 
+      // Notify 3D arc: burn done, attestation starting
+      window.dispatchEvent(new CustomEvent('bridge-step-change', { detail: { step: 'attest' } }));
+
       // ==========================================
       // STEP 3: ATTESTATION
       // ==========================================
@@ -1040,9 +1046,9 @@ export function useBridge() {
         explorerUrl: `https://iris-api-sandbox.circle.com/v2/messages/${fromDomain}?transactionHash=${burnHash}`
       } : s));
 
-      // ==========================================
-      // STEP 4: MINT ON DESTINATION
-      // ==========================================
+      // Notify 3D arc: attestation done, mint starting
+      window.dispatchEvent(new CustomEvent('bridge-step-change', { detail: { step: 'mint' } }));
+
       // ==========================================
       // STEP 4: MINT ON DESTINATION
       // ==========================================
@@ -1116,9 +1122,9 @@ export function useBridge() {
       } : s));
 
       setStatus('success');
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('bridge-state-change', { detail: { isBridging: false } }));
-      }
+      // Notify 3D arc: full success — burst at destination
+      window.dispatchEvent(new CustomEvent('bridge-step-change', { detail: { step: 'success' } }));
+      window.dispatchEvent(new CustomEvent('bridge-state-change', { detail: { isBridging: false } }));
     } catch (err: any) {
       console.error('CCTP Bridge transaction failed:', err);
       if (activeBurnHash) {

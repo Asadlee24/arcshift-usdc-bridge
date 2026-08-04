@@ -77,25 +77,25 @@ export default function Navbar({
     }
   };
 
-  // Dynamic style mappings
-  const navBg = isDark 
-    ? 'bg-[#070B13]/95 border-[#1E293B]' 
-    : 'bg-white/95 border-slate-200 shadow-sm';
-  const textMuted = isDark ? 'text-slate-400' : 'text-slate-500';
-  const textPrimary = isDark ? 'text-white' : 'text-slate-900';
-  const statsBg = isDark ? 'bg-[#0F172A] border-[#1E293B]' : 'bg-slate-50 border-slate-200';
-  const statsPipe = isDark ? 'text-[#1E293B]' : 'text-slate-200';
-  const activeLink = isDark ? 'text-white border-[#10B981]' : 'text-slate-900 border-[#059669]';
-  const pillBg = isDark ? 'bg-[#0F172A] border-[#1E293B]' : 'bg-slate-50 border-slate-200';
-  const hoverBg = isDark ? 'hover:bg-[#131B2E]' : 'hover:bg-slate-100';
-  const activePillBg = isDark 
-    ? 'bg-[#0F172A] border-[#1E293B] text-white hover:bg-[#131B2E]' 
+  // Dynamic style mappings — warm dark, gold accent
+  const navBg = isDark
+    ? 'bg-[#0B0A07]/95 border-[#C8922A]/12'
+    : 'bg-white/95 border-[#E8E6DF] shadow-sm';
+  const textMuted = isDark ? 'text-[#A09880]' : 'text-slate-500';
+  const textPrimary = isDark ? 'text-[#F5F0E8]' : 'text-slate-900';
+  const statsBg = isDark ? 'bg-[#1A170D] border-[#2A2415]' : 'bg-slate-50 border-slate-200';
+  const statsPipe = isDark ? 'text-[#2A2415]' : 'text-slate-200';
+  const activeLink = isDark ? 'text-[#D4A043] border-[#C8922A]' : 'text-slate-900 border-[#C8922A]';
+  const pillBg = isDark ? 'bg-[#1A170D] border-[#2A2415]' : 'bg-slate-50 border-slate-200';
+  const hoverBg = isDark ? 'hover:bg-[#1A170D]' : 'hover:bg-slate-100';
+  const activePillBg = isDark
+    ? 'bg-[#1A170D] border-[#2A2415] text-[#F5F0E8] hover:bg-[#211E10]'
     : 'bg-slate-50 border-slate-200 text-slate-900 hover:bg-slate-100';
-  const dropdownMenuBg = isDark 
-    ? 'bg-[#0F172A] border-[#1E293B]' 
+  const dropdownMenuBg = isDark
+    ? 'bg-[#141209] border-[#2A2415]'
     : 'bg-white border-slate-200 shadow-lg';
-  const dropdownItem = isDark 
-    ? 'text-slate-300 hover:bg-[#131B2E] hover:text-white' 
+  const dropdownItem = isDark
+    ? 'text-[#A09880] hover:bg-[#1A170D] hover:text-[#F5F0E8]'
     : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900';
 
   return (
@@ -118,7 +118,7 @@ export default function Navbar({
               <span className={`${activeLink} border-b-2 py-1 cursor-default`}>Bridge</span>
               <a
                 href="/analytics"
-                className="hover:text-[#10B981] transition-colors py-1 cursor-pointer"
+                className="hover:text-[#C8922A] transition-colors py-1 cursor-pointer"
               >
                 Analytics
               </a>

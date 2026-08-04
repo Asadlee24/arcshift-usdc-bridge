@@ -1,92 +1,111 @@
 /* app/globals.css */
-/* ArcShift design system — light "precision fintech" theme.
+/* ArcShift design system — "bridge" identity.
  *
- * Identity notes:
- *  - Canvas is a warm paper neutral (#FBFBFC), not cold blue-grey. Reads as
- *    paper/document rather than "dark theme with the lights turned on".
- *  - Text is ink (#12141A), not pure black. Softer on white, still 15:1 contrast.
- *  - Depth comes from many tight, low-alpha shadow layers rather than one big
- *    blur. That is what reads as "crisp" instead of "floaty".
- *  - Borders are hairlines of ink at low alpha, so they sit on any background.
- *  - Emerald stays the brand colour, but split into two roles: a bright fill
- *    (#10B981) and a darker ink-safe variant (#047857) for text/icons on white.
- *    #10B981 as text on white is ~2.2:1 and fails WCAG AA; #047857 is ~4.8:1.
+ * Brand premise: a bridge. Value crossing a boundary, trust made visible through
+ * motion. The dominant accent is gold (#C8922A) — not because it's DeFi-generic
+ * but because gold reads as "stored value moving" and contrasts cleanly with the
+ * deep teal (#0C4A6E) used for destination-chain states.
+ *
+ * Typographic voice: Playfair Display (display headings) + DM Sans (body).
+ * Playfair adds editorial weight to the hero; DM Sans keeps functional UI text
+ * legible and neutral.
  */
 
 @import "tailwindcss";
 
 @theme {
-  /* Mapped to Tailwind utilities (bg-bg-card, text-text-muted, etc.).
-     Names are kept from the previous dark theme so existing markup keeps
-     working — only the values are retuned for light. */
-  --color-bg-page: #FBFBFC;
+  --color-bg-page: #FAFAF8;
   --color-bg-card: #FFFFFF;
-  --color-border-card: #E8E8EC;
+  --color-border-card: #E8E6DF;
   --color-text-primary: #12141A;
   --color-text-muted: #5C6470;
   --color-text-subtle: #8A919E;
+  --color-accent-gold: #C8922A;
+  --color-accent-gold-hover: #A87520;
   --color-accent-green: #047857;
   --color-accent-green-hover: #036249;
+  --color-accent-teal: #0C4A6E;
 
-  /* Type: one display face for headlines, one text face, one mono for figures. */
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  /* Three typefaces, three distinct roles. */
+  --font-display: var(--font-display), 'Playfair Display', Georgia, serif;
+  --font-body: var(--font-body), 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-sans: var(--font-sans), 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono: 'JetBrains Mono', 'SF Mono', ui-monospace, 'Cascadia Mono', Menlo, monospace;
 
-  /* Display sizes carry negative tracking; small text carries positive. */
-  --text-display: 3.75rem;
+  --text-display: 4rem;
   --text-display--line-height: 1.02;
   --text-display--letter-spacing: -0.035em;
-  --text-title: 1.75rem;
-  --text-title--line-height: 1.15;
-  --text-title--letter-spacing: -0.022em;
+  --text-title: 1.875rem;
+  --text-title--line-height: 1.12;
+  --text-title--letter-spacing: -0.025em;
 }
 
 :root {
-  /* Surfaces */
-  --bg-page: #FBFBFC;
+  /* Surfaces — warm paper, not cold blue-grey */
+  --bg-page: #FAFAF8;
   --bg-card: #FFFFFF;
-  --bg-input-box: #F6F7F9;
-  --bg-sunken: #F1F2F5;
-  --border-card: #E8E8EC;
-  --border-strong: #D6D8DE;
+  --bg-input-box: #F6F5F1;
+  --bg-sunken: #F0EEE9;
+  --border-card: #E8E6DF;
+  --border-strong: #D4D0C8;
 
   /* Ink scale */
   --text-primary: #12141A;
   --text-muted: #5C6470;
   --text-subtle: #8A919E;
 
-  /* Brand — fill vs. ink-safe */
+  /* Gold — hero accent. Ink-safe on white at AA for bold text at ≥18px. */
+  --accent-gold: #C8922A;
+  --accent-gold-hover: #A87520;
+  --accent-gold-light: rgba(200, 146, 42, 0.10);
+  --accent-gold-ring: rgba(200, 146, 42, 0.30);
+  --accent-gold-glow: rgba(200, 146, 42, 0.22);
+
+  /* Teal — destination chain accent, distinct from source gold */
+  --accent-teal: #0C4A6E;
+  --accent-teal-mid: #0891B2;
+  --accent-teal-light: rgba(8, 145, 178, 0.10);
+
+  /* Emerald — success / live states only */
   --accent-green: #10B981;
   --accent-green-ink: #047857;
   --accent-green-hover: #036249;
   --accent-green-light: rgba(16, 185, 129, 0.10);
   --accent-green-ring: rgba(16, 185, 129, 0.28);
 
-  /* Solana purple, ink-safe for light backgrounds */
+  /* Solana purple */
   --accent-purple: #7C3AED;
   --accent-purple-light: rgba(124, 58, 237, 0.10);
 
-  /* Status — all ink-safe on white */
+  /* Status */
   --success: #047857;
   --warning: #B45309;
   --error: #DC2626;
 
-  /* Shadow primitive: tint shadows toward the brand hue rather than pure
-     black, so cards feel colour-consistent instead of grey and muddy. */
-  --shadow-hue: 210 24% 16%;
+  --shadow-hue: 36 60% 25%;
 }
 
 .dark {
-  --bg-page: #050811;
-  --bg-card: #0C1220;
-  --bg-input-box: #080D1A;
-  --bg-sunken: #0F172A;
-  --border-card: rgba(30, 41, 59, 0.8);
-  --border-strong: rgba(51, 65, 85, 0.9);
+  --bg-page: #0B0A07;
+  --bg-card: #141209;
+  --bg-input-box: #0F0E0B;
+  --bg-sunken: #1A180F;
+  --border-card: rgba(200, 146, 42, 0.12);
+  --border-strong: rgba(200, 146, 42, 0.22);
 
-  --text-primary: #F8FAFC;
-  --text-muted: #94A3B8;
-  --text-subtle: #64748B;
+  --text-primary: #F5F0E8;
+  --text-muted: #A09880;
+  --text-subtle: #6B6150;
+
+  --accent-gold: #D4A043;
+  --accent-gold-hover: #C8922A;
+  --accent-gold-light: rgba(200, 146, 42, 0.15);
+  --accent-gold-ring: rgba(200, 146, 42, 0.40);
+  --accent-gold-glow: rgba(200, 146, 42, 0.35);
+
+  --accent-teal: #38BDF8;
+  --accent-teal-mid: #0EA5E9;
+  --accent-teal-light: rgba(56, 189, 248, 0.15);
 
   --accent-green: #10B981;
   --accent-green-ink: #34D399;
@@ -102,23 +121,46 @@
   --error: #F87171;
 }
 
-/* Glassmorphism & Neon Glow Utilities */
+/* ============================================================
+ * Glassmorphism — two flavours, both tuned for the gold accent.
+ * ============================================================ */
 .glass-panel-dark {
-  background: rgba(12, 18, 32, 0.75);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(16, 185, 129, 0.15);
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37), 0 0 20px 0 rgba(16, 185, 129, 0.05);
+  background: rgba(20, 18, 9, 0.82);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(200, 146, 42, 0.18);
+  box-shadow:
+    0 8px 32px 0 rgba(0, 0, 0, 0.45),
+    0 0 0 1px rgba(200, 146, 42, 0.08) inset,
+    0 0 40px 0 rgba(200, 146, 42, 0.06);
 }
 
 .glass-panel-light {
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(226, 232, 240, 0.8);
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.05);
+  background: rgba(255, 253, 248, 0.88);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(200, 146, 42, 0.15);
+  box-shadow:
+    0 8px 32px 0 rgba(18, 20, 26, 0.06),
+    0 0 0 1px rgba(200, 146, 42, 0.06) inset;
 }
 
+/* Gold arc card glow */
+.glow-card-gold {
+  box-shadow:
+    0 0 0 1px rgba(200, 146, 42, 0.15),
+    0 4px 16px -4px rgba(200, 146, 42, 0.20),
+    0 20px 48px -12px rgba(200, 146, 42, 0.12);
+}
+
+.glow-card-gold:hover {
+  box-shadow:
+    0 0 0 1px rgba(200, 146, 42, 0.25),
+    0 4px 24px -4px rgba(200, 146, 42, 0.30),
+    0 20px 56px -12px rgba(200, 146, 42, 0.18);
+}
+
+/* Kept for compat */
 .glow-card-emerald {
   box-shadow: 0 0 25px -5px rgba(16, 185, 129, 0.25), 0 0 10px -2px rgba(16, 185, 129, 0.15);
 }
@@ -126,6 +168,38 @@
 .glow-border-emerald:hover {
   border-color: rgba(16, 185, 129, 0.5);
   box-shadow: 0 0 15px 0 rgba(16, 185, 129, 0.2);
+}
+
+/* ============================================================
+ * Font-family utilities (CSS variables from next/font).
+ * ============================================================ */
+.font-display {
+  font-family: var(--font-display), 'Playfair Display', Georgia, serif;
+}
+
+.font-body {
+  font-family: var(--font-body), 'DM Sans', -apple-system, sans-serif;
+}
+
+/* ============================================================
+ * Arc bridge particle trail shimmer.
+ * ============================================================ */
+@keyframes arc-pulse {
+  0%, 100% { opacity: 0.5; transform: scaleX(1); }
+  50% { opacity: 1; transform: scaleX(1.02); }
+}
+
+.arc-pulse {
+  animation: arc-pulse 3s ease-in-out infinite;
+}
+
+@keyframes float-y {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-8px); }
+}
+
+.float-y {
+  animation: float-y 6s ease-in-out infinite;
 }
 
 * {
@@ -137,14 +211,13 @@ html {
 }
 
 body {
-  font-family: var(--font-sans);
+  font-family: var(--font-body), 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
   background-color: var(--bg-page);
   color: var(--text-primary);
   overflow-x: hidden;
   margin: 0;
   padding: 0;
   min-height: 100vh;
-  /* Optical refinements that make light UIs feel intentional. */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   font-feature-settings: 'cv05' 1, 'ss03' 1;
@@ -152,29 +225,27 @@ body {
 }
 
 /* ---------------------------------------------------------------------------
- * Signature background
- * A hairline grid plus two soft colour washes. This is the one decorative
- * element and it's what distinguishes the page from stock Tailwind white.
+ * Signature background — warm paper with gold-tinted grid.
+ * The grid references the "bridge" grid/lattice motif without being literal.
  * ------------------------------------------------------------------------ */
 .arc-canvas {
   position: relative;
   background-color: var(--bg-page);
   background-image:
-    linear-gradient(to right, rgba(18, 20, 26, 0.032) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(18, 20, 26, 0.032) 1px, transparent 1px);
-  background-size: 64px 64px;
+    linear-gradient(to right, rgba(200, 146, 42, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(200, 146, 42, 0.04) 1px, transparent 1px);
+  background-size: 72px 72px;
 }
 
-/* Fade the grid out toward the edges so it never looks like a table. */
 .arc-canvas::before {
   content: '';
   position: absolute;
   inset: 0;
   pointer-events: none;
   background:
-    radial-gradient(70% 55% at 50% 0%, rgba(16, 185, 129, 0.07), transparent 70%),
-    radial-gradient(50% 45% at 88% 18%, rgba(59, 130, 246, 0.05), transparent 72%),
-    linear-gradient(to bottom, transparent 55%, var(--bg-page) 100%);
+    radial-gradient(60% 50% at 50% 0%, rgba(200, 146, 42, 0.07), transparent 70%),
+    radial-gradient(40% 35% at 85% 15%, rgba(8, 145, 178, 0.05), transparent 65%),
+    linear-gradient(to bottom, transparent 60%, var(--bg-page) 100%);
 }
 
 /* ---------------------------------------------------------------------------
