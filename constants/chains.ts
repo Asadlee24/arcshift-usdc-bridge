@@ -35,7 +35,7 @@ export const SUPPORTED_CHAINS: ChainMetadata[] = [
     usdcAddress: '0x3600000000000000000000000000000000000000',
     isNativeArc: true,
     cctpDomain: 26,
-    supportsForwarding: false, // Arc Testnet forwarding service is unconfirmed; default to manual mint fallback
+    supportsForwarding: true,
   },
 
   // ─── STABLE EVM CHAINS ──────────────────────────────────────────
@@ -252,7 +252,7 @@ export const SUPPORTED_CHAINS: ChainMetadata[] = [
     usdcAddress: '0xcfc8330f4bcab529c625d12781b1c19466a9fc8b',
     isNativeArc: false,
     cctpDomain: 31,
-    supportsForwarding: false,
+    supportsForwarding: true,
   },
   {
     id: 656476,
@@ -294,7 +294,7 @@ export const SUPPORTED_CHAINS: ChainMetadata[] = [
     usdcAddress: '0x0C382e685bbeeFE5d3d9C29e29E341fEE8E84C5d',
     isNativeArc: false,
     cctpDomain: 29,
-    supportsForwarding: false,
+    supportsForwarding: true,
   },
   {
     id: 2810,
@@ -309,7 +309,7 @@ export const SUPPORTED_CHAINS: ChainMetadata[] = [
     isNativeArc: false,
     cctpDomain: 30,
     isComingSoon: true,
-    supportsForwarding: false,
+    supportsForwarding: true,
   },
   {
     id: 98867,

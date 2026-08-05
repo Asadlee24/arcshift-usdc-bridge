@@ -1,6 +1,6 @@
 // hooks/useBridge.ts
-// Core CCTP Bridge Hook managing the 4-step manual / 3-step Forwarding progress state machine, timers, and transaction links
-// Supports hybrid mode: Circle CCTP Forwarding Service (auto-mint) where supported, manual mint fallback everywhere else.
+// Core CCTP Bridge Hook — All routes use Circle CCTP Forwarding Service (depositForBurnWithHook).
+// 3-step flow: Approve → Burn & Forward → Circle Auto-Relay. No manual mint required.
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { getChainById } from '../constants/chains';
@@ -336,20 +336,14 @@ export function useBridge() {
     {
       name: 'burn',
       status: 'pending',
-      label: 'Burn USDC',
-      description: 'Burning USDC via Circle CCTP',
+      label: 'Burn & Forward USDC',
+      description: 'Burning USDC & registering Circle auto-relay hook',
     },
     {
       name: 'attest',
       status: 'pending',
-      label: 'Circle Attestation',
-      description: "Waiting for Circle's consensus signatures (~15s)",
-    },
-    {
-      name: 'mint',
-      status: 'pending',
-      label: 'Mint on Destination',
-      description: 'Minting native USDC on destination chain',
+      label: 'Circle Auto-Relaying',
+      description: 'Circle is processing & minting on destination automatically',
     },
   ]);
 
@@ -396,20 +390,14 @@ export function useBridge() {
       {
         name: 'burn',
         status: 'pending',
-        label: 'Burn USDC',
-        description: 'Burning USDC via Circle CCTP',
+        label: 'Burn & Forward USDC',
+        description: 'Burning USDC & registering Circle auto-relay hook',
       },
       {
         name: 'attest',
         status: 'pending',
-        label: 'Circle Attestation',
-        description: "Waiting for Circle's consensus signatures (~15s)",
-      },
-      {
-        name: 'mint',
-        status: 'pending',
-        label: 'Mint on Destination',
-        description: 'Minting native USDC on destination chain',
+        label: 'Circle Auto-Relaying',
+        description: 'Circle is processing & minting on destination automatically',
       },
     ]);
     if (timerRef.current) clearInterval(timerRef.current);
@@ -474,8 +462,8 @@ export function useBridge() {
 
     if (typeof window === 'undefined') return;
 
-    // Check if destination supports Circle CCTP Forwarding Service
-    const isForwarding = toChain.supportsForwarding === true;
+    // All routes use Circle CCTP Forwarding Service — always 3-step auto-relay
+    const isForwarding = true;
 
     // ─── SOLANA ROUTE (AppKit) ──────────────────────────────────────────
     const isSolanaRoute = fromChain.isSolana || toChain.isSolana;
@@ -535,21 +523,15 @@ export function useBridge() {
         {
           name: 'burn',
           status: 'pending',
-          label: isForwarding ? 'Burn & Forward USDC' : 'Burn USDC',
-          description: isForwarding ? `Burning USDC & registering Circle auto-relay hook on ${fromChain.name}` : `Burning USDC via Circle CCTP on ${fromChain.name}`,
+          label: 'Burn & Forward USDC',
+          description: `Burning USDC & registering Circle auto-relay hook on ${fromChain.name}`,
         },
         {
           name: 'attest',
           status: 'pending',
-          label: isForwarding ? 'Circle Auto-Relaying' : 'Circle Attestation',
-          description: isForwarding ? 'Circle is processing attestation & minting on destination automatically' : "Waiting for Circle's consensus signatures (~15s)",
+          label: 'Circle Auto-Relaying',
+          description: 'Circle is processing attestation & minting on destination automatically',
         },
-        ...(isForwarding ? [] : [{
-          name: 'mint' as BridgeStepName,
-          status: 'pending' as const,
-          label: `Mint on ${toChain.shortName}`,
-          description: `Minting native USDC on ${toChain.name}`,
-        }]),
       ]);
 
       try {
@@ -640,26 +622,8 @@ export function useBridge() {
 
           } else if (method === 'fetchAttestation') {
             setSteps(prev => prev.map(s => s.name === 'attest' ? {
-              ...s, status: isForwarding ? 'done' : 'done', txHash: 'Confirmed',
+              ...s, status: 'done', txHash: 'Auto-Relayed',
               explorerUrl: `https://iris-api-sandbox.circle.com/v2/messages/${fromChain.cctpDomain}?transactionHash=${tempBurnHash}`
-            } : s));
-            if (!isForwarding) {
-              setSteps(prev => prev.map(s => s.name === 'mint' ? { ...s, status: 'active' } : s));
-            }
-
-          } else if (method === 'mint' && !isForwarding) {
-            const txHash = event.values?.txHash || '';
-            setDestTxHash(txHash);
-            if (tempBurnHash) {
-              updateTransaction(tempBurnHash, { status: 'success', mintTxHash: txHash });
-            }
-            setSteps(prev => prev.map(s => s.name === 'mint' ? {
-              ...s, status: 'done',
-              description: 'USDC claimed and minted on destination',
-              txHash: txHash ? (txHash.substring(0, 10) + '...') : 'Minted',
-              explorerUrl: toChain.isSolana
-                ? `https://solscan.io/tx/${txHash}?cluster=devnet`
-                : `${toChain.explorerUrl}/tx/${txHash}`
             } : s));
           }
         };
@@ -735,7 +699,7 @@ export function useBridge() {
       const fromDomain = fromChain.cctpDomain ?? 0;
       const toDomain = toChain.cctpDomain ?? 0;
 
-      // Configure steps dynamically: 3 steps for Forwarding, 4 steps for Manual mint fallback
+      // Always 3 steps: Approve → Burn & Forward → Circle Auto-Relay
       setSteps([
         {
           name: 'approve',
@@ -746,21 +710,15 @@ export function useBridge() {
         {
           name: 'burn',
           status: 'pending',
-          label: isForwarding ? 'Burn & Forward USDC' : 'Burn USDC',
-          description: isForwarding ? `Burning USDC & attaching Circle auto-relay hook on ${fromChain.name}` : `Burning USDC via Circle CCTP on ${fromChain.name}`,
+          label: 'Burn & Forward USDC',
+          description: `Burning USDC & attaching Circle auto-relay hook on ${fromChain.name}`,
         },
         {
           name: 'attest',
           status: 'pending',
-          label: isForwarding ? 'Circle Auto-Relaying' : 'Circle Attestation',
-          description: isForwarding ? 'Circle is completing attestation & minting on destination automatically' : "Waiting for Circle's consensus signatures (~15s)",
+          label: 'Circle Auto-Relaying',
+          description: 'Circle is completing attestation & minting on destination automatically',
         },
-        ...(isForwarding ? [] : [{
-          name: 'mint' as BridgeStepName,
-          status: 'pending' as const,
-          label: `Mint on ${toChain.shortName}`,
-          description: `Minting native USDC on ${toChain.name}`,
-        }]),
       ]);
 
       const tokenMessenger = '0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA';
@@ -894,54 +852,29 @@ export function useBridge() {
       try {
         let txHash: `0x${string}`;
 
-        if (isForwarding) {
-          // Forwarding Service route: depositForBurnWithHook
-          console.log(`Executing CCTP depositForBurnWithHook to ${toChain.name} (Domain ${toDomain})`);
-          txHash = await writeContract(config, {
-            address: tokenMessenger as `0x${string}`,
-            abi: TOKEN_MESSENGER_ABI,
-            functionName: 'depositForBurnWithHook',
-            args: [
-              amountInUnits,
-              toDomain,
-              destinationAddressBytes32,
-              fromChain.usdcAddress as `0x${string}`,
-              destinationCallerBytes32,
-              maxFee,
-              speedMode === 'fast' ? 1000 : 2000,
-              CCTP_FORWARD_HOOK_DATA
-            ],
-            chainId: fromChain.id as any,
-            ...(isOpStack ? {
-              gas: BigInt(400000),
-              gasPrice: currentGasPrice,
-              type: 'legacy'
-            } : {})
-          });
-        } else {
-          // Manual mint fallback route: depositForBurn
-          console.log(`Executing CCTP depositForBurn (manual mint fallback) to ${toChain.name} (Domain ${toDomain})`);
-          txHash = await writeContract(config, {
-            address: tokenMessenger as `0x${string}`,
-            abi: TOKEN_MESSENGER_ABI,
-            functionName: 'depositForBurn',
-            args: [
-              amountInUnits,
-              toDomain,
-              destinationAddressBytes32,
-              fromChain.usdcAddress as `0x${string}`,
-              destinationCallerBytes32,
-              maxFee,
-              speedMode === 'fast' ? 1000 : 2000
-            ],
-            chainId: fromChain.id as any,
-            ...(isOpStack ? {
-              gas: BigInt(360000),
-              gasPrice: currentGasPrice,
-              type: 'legacy'
-            } : {})
-          });
-        }
+        // Always use depositForBurnWithHook — Circle CCTP Forwarding Service auto-relay
+        console.log(`Executing CCTP depositForBurnWithHook to ${toChain.name} (Domain ${toDomain})`);
+        txHash = await writeContract(config, {
+          address: tokenMessenger as `0x${string}`,
+          abi: TOKEN_MESSENGER_ABI,
+          functionName: 'depositForBurnWithHook',
+          args: [
+            amountInUnits,
+            toDomain,
+            destinationAddressBytes32,
+            fromChain.usdcAddress as `0x${string}`,
+            destinationCallerBytes32,
+            maxFee,
+            speedMode === 'fast' ? 1000 : 2000,
+            CCTP_FORWARD_HOOK_DATA
+          ],
+          chainId: fromChain.id as any,
+          ...(isOpStack ? {
+            gas: BigInt(400000),
+            gasPrice: currentGasPrice,
+            type: 'legacy'
+          } : {})
+        });
 
         const burnReceipt = await waitForTransactionReceipt(config, { hash: txHash });
         if (burnReceipt.status === 'reverted') {
@@ -988,96 +921,20 @@ export function useBridge() {
       const attestationMessage = await retrieveAttestation(burnHash, fromDomain);
       if (attestTimerRef.current) clearInterval(attestTimerRef.current);
 
+      // FORWARDING COMPLETE — Circle auto-relays attestation & mints on destination
       setSteps(prev => prev.map(s => s.name === 'attest' ? {
         ...s,
         status: 'done',
-        label: isForwarding ? 'Circle Auto-Relayed' : 'Circle Attestation',
-        description: isForwarding ? 'Circle forwarded attestation & minted USDC on destination automatically' : "Circle consensus verified",
-        txHash: 'Confirmed',
+        label: 'Circle Auto-Relayed ⚡',
+        description: 'Circle forwarded attestation & minted USDC on destination automatically',
+        txHash: 'Auto-Relayed',
         explorerUrl: `https://iris-api-sandbox.circle.com/v2/messages/${fromDomain}?transactionHash=${burnHash}`
       } : s));
 
-      if (isForwarding) {
-        // FORWARDING ROUTE COMPLETE: Circle auto-relays the mint on destination!
-        updateTransaction(burnHash, {
-          status: 'success',
-          mintTxHash: 'auto-relayed'
-        });
-        setStatus('success');
-        window.dispatchEvent(new CustomEvent('bridge-step-change', { detail: { step: 'success' } }));
-        window.dispatchEvent(new CustomEvent('bridge-state-change', { detail: { isBridging: false } }));
-        return;
-      }
-
-      // ==========================================
-      // STEP 4: MANUAL MINT FALLBACK (Non-forwarding routes like Arc Testnet)
-      // ==========================================
-      window.dispatchEvent(new CustomEvent('bridge-step-change', { detail: { step: 'mint' } }));
-      setSteps(prev => prev.map(s => s.name === 'mint' ? { ...s, status: 'active' } : s));
-
-      let mintHash = '';
-
-      const currentAccount = getAccount(config);
-      if (currentAccount.chainId !== toChain.id) {
-        await switchChain(config, { chainId: toChain.id as any });
-      }
-
-      let mintGasPrice;
-      try {
-        mintGasPrice = await getGasPrice(config, { chainId: toChain.id as any });
-      } catch (err) {
-        console.warn("Failed to fetch mint gas price:", err);
-      }
-
-      const isDestOpStack = [11155420, 1301, 763373].includes(toChain.id);
-
-      try {
-        const txHash = await writeContract(config, {
-          address: destinationTransmitter as `0x${string}`,
-          abi: MESSAGE_TRANSMITTER_ABI,
-          functionName: 'receiveMessage',
-          args: [
-            attestationMessage.message as `0x${string}`,
-            attestationMessage.attestation as `0x${string}`
-          ],
-          chainId: toChain.id as any,
-          ...(isDestOpStack ? {
-            gas: BigInt(400000),
-            gasPrice: mintGasPrice,
-            type: 'legacy'
-          } : {})
-        });
-
-        const mintReceipt = await waitForTransactionReceipt(config, { hash: txHash });
-        if (mintReceipt.status === 'reverted') {
-          throw new Error('Mint transaction reverted on-chain. Please ensure your attestation is valid.');
-        }
-        mintHash = txHash;
-      } catch (mintErr) {
-        console.error('Mint transaction failed:', mintErr);
-        const detail = mintErr instanceof Error ? mintErr.message : String(mintErr);
-        throw new Error(
-          `Your USDC was burned on ${fromChain.name} but the manual mint on ${toChain.name} did not complete. ` +
-          `Funds are not lost — the attestation is valid and the mint can be retried. ` +
-          `Burn tx: ${burnHash}. Underlying error: ${detail}`
-        );
-      }
-
-      setDestTxHash(mintHash);
-
       updateTransaction(burnHash, {
         status: 'success',
-        mintTxHash: mintHash
+        mintTxHash: 'auto-relayed'
       });
-
-      setSteps(prev => prev.map(s => s.name === 'mint' ? {
-        ...s,
-        status: 'done',
-        description: 'USDC claimed and minted on destination',
-        txHash: mintHash.substring(0, 10) + '...',
-        explorerUrl: `${toChain.explorerUrl}/tx/${mintHash}`
-      } : s));
-
       setStatus('success');
       window.dispatchEvent(new CustomEvent('bridge-step-change', { detail: { step: 'success' } }));
       window.dispatchEvent(new CustomEvent('bridge-state-change', { detail: { isBridging: false } }));
