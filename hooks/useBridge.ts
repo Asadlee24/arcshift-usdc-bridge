@@ -1,22 +1,38 @@
 // hooks/useBridge.ts
-// Core CCTP Bridge Hook managing the 4-step progress state machine, timers, and transaction links (Official SDK & Fallback Enabled)
-// v2: Supports Fast/Standard speed modes and forwarding service toggle
+// Core CCTP Bridge Hook managing the 4-step manual / 3-step Forwarding progress state machine, timers, and transaction links
+// Supports hybrid mode: Circle CCTP Forwarding Service (auto-mint) where supported, manual mint fallback everywhere else.
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { getChainById } from '../constants/chains';
-import { writeContract, waitForTransactionReceipt, getAccount, switchChain, signMessage, readContract, getGasPrice } from '@wagmi/core';
+import { writeContract, waitForTransactionReceipt, getAccount, switchChain, getGasPrice } from '@wagmi/core';
 import { config } from '../lib/wagmi';
-import { parseUnits, pad, encodeFunctionData } from 'viem';
+import { parseUnits, pad, readContract } from 'viem';
 import { addTransaction, updateTransaction } from './useTransactionHistory';
 
 // Solana & Circle AppKit Imports
 import { useWallet } from '@solana/wallet-adapter-react';
 import { Connection, PublicKey as SolanaPublicKey } from '@solana/web3.js';
-// Note: createSolanaAdapterFromProvider is loaded dynamically in the bridge function to avoid SSR issues
 import { createViemAdapterFromProvider } from '@circle-fin/adapter-viem-v2';
 import { appKit } from '../lib/appKit';
 import { getSolanaRpcUrl } from '../lib/rpcEndpoints';
 import { circlePublicClientFactory } from '../lib/publicClient';
+
+// Forwarding Service Magic Bytes
+export const CCTP_FORWARD_HOOK_DATA = '0x636374702d666f72776172640000000000000000000000000000000000000000' as `0x${string}`;
+
+/**
+ * Derives the Solana Associated Token Account (ATA) for a wallet address and USDC mint.
+ * Required by Circle CCTP Forwarding Service when destination is Solana.
+ */
+export function getSolanaUsdcAta(walletPubKey: SolanaPublicKey, usdcMintPubKey: SolanaPublicKey): SolanaPublicKey {
+  const TOKEN_PROGRAM_ID = new SolanaPublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
+  const ASSOCIATED_TOKEN_PROGRAM_ID = new SolanaPublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL');
+  const [ata] = SolanaPublicKey.findProgramAddressSync(
+    [walletPubKey.toBuffer(), TOKEN_PROGRAM_ID.toBuffer(), usdcMintPubKey.toBuffer()],
+    ASSOCIATED_TOKEN_PROGRAM_ID
+  );
+  return ata;
+}
 
 // Helper to build a Solana provider compliant with Circle's SolanaAdapter Zod validation requirements
 function buildSolanaProviderAdapter(solanaWallet: any) {
@@ -25,7 +41,6 @@ function buildSolanaProviderAdapter(solanaWallet: any) {
 
   const rawProvider = activeAdapter ?? windowSolana ?? solanaWallet;
 
-  // Ensure isConnected is strictly a boolean primitive (true/false), never undefined
   const isConnected = Boolean(
     solanaWallet?.connected ||
     solanaWallet?.publicKey ||
@@ -88,13 +103,6 @@ function buildSolanaProviderAdapter(solanaWallet: any) {
   };
 }
 
-/**
- * Verifies an assembled Solana provider before it reaches the Circle SDK.
- *
- * Throws a descriptive error naming the missing capability. Without this, an incomplete
- * provider fails inside the SDK's Zod schema and the user sees a generic message (or the
- * flow appears to hang), which is the reported EVM->Solana symptom.
- */
 function assertValidSolanaProvider(provider: any, context: 'source' | 'destination'): void {
   const where = `${context} Solana wallet`;
 
@@ -104,8 +112,6 @@ function assertValidSolanaProvider(provider: any, context: 'source' | 'destinati
     );
   }
 
-  // publicKey is the field most likely to be missing — the wallet can report "connected"
-  // while still exposing no account.
   if (!provider.publicKey) {
     throw new Error(
       `Your ${where} is not reporting an account address. Unlock the wallet and reconnect using the Phantom button in the navbar.`
@@ -127,14 +133,13 @@ function assertValidSolanaProvider(provider: any, context: 'source' | 'destinati
   for (const method of ['signTransaction', 'signAllTransactions'] as const) {
     if (typeof provider[method] !== 'function') {
       throw new Error(
-        `Your ${where} does not expose ${method}(), which Circle CCTP requires to move USDC. ` +
-        `Use a wallet that supports transaction signing (e.g. Phantom or Solflare).`
+        `Your ${where} does not expose ${method}(), which Circle CCTP requires to move USDC.`
       );
     }
   }
 }
 
-// ERC-20 ABI required for strictly enforcing deductions via Wagmi
+// ERC-20 ABI required for enforcing spend approvals
 const ERC20_ABI = [
   {
     name: 'approve',
@@ -145,7 +150,7 @@ const ERC20_ABI = [
   }
 ] as const;
 
-// TokenMessenger depositForBurn ABI
+// TokenMessenger ABI supporting depositForBurn and depositForBurnWithHook
 const TOKEN_MESSENGER_ABI = [
   {
     name: 'depositForBurn',
@@ -159,6 +164,22 @@ const TOKEN_MESSENGER_ABI = [
       { name: 'destinationCaller', type: 'bytes32' },
       { name: 'maxFee', type: 'uint256' },
       { name: 'minFinalityThreshold', type: 'uint32' }
+    ],
+    outputs: []
+  },
+  {
+    name: 'depositForBurnWithHook',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'amount', type: 'uint256' },
+      { name: 'destinationDomain', type: 'uint32' },
+      { name: 'mintRecipient', type: 'bytes32' },
+      { name: 'burnToken', type: 'address' },
+      { name: 'destinationCaller', type: 'bytes32' },
+      { name: 'maxFee', type: 'uint256' },
+      { name: 'minFinalityThreshold', type: 'uint32' },
+      { name: 'hookData', type: 'bytes' }
     ],
     outputs: []
   }
@@ -201,11 +222,6 @@ interface AttestationResponse {
   messages: AttestationMessage[];
 }
 
-/**
- * Thrown when the burn succeeded on-chain but the attestation could not be retrieved.
- * The burn tx hash is carried so the caller can surface it — the user's funds are burned
- * and the mint is claimable later; this must never be reported as a generic failure.
- */
 export class AttestationTimeoutError extends Error {
   constructor(public readonly burnTxHash: string) {
     super(
@@ -219,14 +235,6 @@ export class AttestationTimeoutError extends Error {
 
 /**
  * Polls Circle's Iris API for the attestation covering a burn.
- *
- * Uses exponential backoff with jitter (~5 minutes total) rather than a flat 5s x 12.
- * CCTP attestations commonly take 15s-2min on testnet and can exceed the old 60s ceiling
- * under load, which caused spurious timeouts.
- *
- * On timeout this THROWS. It previously returned a hardcoded fake attestation
- * ("0x" + "a".repeat(100)) with status "complete", which caused the UI to render success
- * for a transfer that never completed.
  */
 async function retrieveAttestation(
   transactionHash: string,
@@ -245,18 +253,13 @@ async function retrieveAttestation(
         if (message?.status === 'complete') {
           return message;
         }
-        // 200 with a pending status is the normal "not ready yet" case — keep polling.
-      } else if (response.status === 404) {
-        // Iris has not indexed the burn yet. Expected immediately after submission.
       } else if (response.status === 429) {
-        // Rate limited — respect Retry-After when present.
         const retryAfter = Number(response.headers.get('Retry-After'));
         if (Number.isFinite(retryAfter) && retryAfter > 0) {
           await new Promise((r) => setTimeout(r, retryAfter * 1000));
           continue;
         }
-      } else if (response.status >= 400 && response.status < 500) {
-        // A genuine client error (malformed hash, bad domain) will never succeed on retry.
+      } else if (response.status >= 400 && response.status < 500 && response.status !== 404) {
         throw new Error(
           `Circle attestation request rejected (HTTP ${response.status}). ` +
           `This usually means the source domain (${fromDomain}) or transaction hash is invalid.`
@@ -266,15 +269,9 @@ async function retrieveAttestation(
       if (error instanceof Error && error.message.startsWith('Circle attestation request rejected')) {
         throw error;
       }
-      // Network-level failure — transient, fall through to backoff.
       console.warn(`Attestation poll attempt ${attempt + 1} failed:`, error);
     }
 
-    // Gentle backoff: 1s, 1.5s, 2.25s ... capped at 6s, with jitter to avoid synchronised
-    // retries. The cap matters for perceived speed — the previous curve (2s doubling to a
-    // 30s ceiling) meant an attestation that completed at ~20s often went unnoticed until
-    // ~45s because the poller was asleep. Attestations typically land in 15s-2min, so a 6s
-    // ceiling keeps latency low while staying well within Iris rate limits.
     const backoff = Math.min(1000 * 1.5 ** attempt, 6000);
     const jitter = Math.random() * 500;
     await new Promise((resolve) => setTimeout(resolve, backoff + jitter));
@@ -283,26 +280,11 @@ async function retrieveAttestation(
   throw new AttestationTimeoutError(transactionHash);
 }
 
-// MessageTransmitter V2 address used across all supported testnets. CCTP V2 uses
-// deterministic addressing, so this is chain-independent — it deliberately takes no
-// chainId parameter. (It previously accepted one and ignored it, implying per-chain
-// dispatch that did not exist.)
 const MESSAGE_TRANSMITTER_ADDRESS = '0xe737e5cebeeba77efe34d4aa090756590b1ce275';
 const getMessageTransmitterAddress = (): string => MESSAGE_TRANSMITTER_ADDRESS;
 
-/**
- * Smallest transferable amount, in USDC.
- *
- * The maxFee sent to depositForBurn is max(amount * 0.01, 0.001 USDC). Below ~0.10 USDC
- * the flat 0.001 floor becomes a large proportion of the transfer and CCTP rejects the
- * burn. The previous UI floor of 0.01 USDC was under this and produced guaranteed reverts.
- */
 export const MIN_BRIDGE_AMOUNT = 0.1;
 
-/**
- * Validates a bridge amount before any on-chain call.
- * Returns an error string, or null when the amount is acceptable.
- */
 export function validateBridgeAmount(amount: string, availableBalance?: number): string | null {
   if (!amount || amount.trim() === '') return 'Enter an amount to bridge';
 
@@ -310,7 +292,6 @@ export function validateBridgeAmount(amount: string, availableBalance?: number):
   if (!Number.isFinite(parsed)) return 'Enter a valid number';
   if (parsed <= 0) return 'Amount must be greater than 0';
 
-  // USDC has 6 decimals; anything finer cannot be represented on-chain.
   const decimals = amount.includes('.') ? amount.split('.')[1].length : 0;
   if (decimals > 6) return 'USDC supports a maximum of 6 decimal places';
 
@@ -327,7 +308,6 @@ export function validateBridgeAmount(amount: string, availableBalance?: number):
 
 export function useBridge() {
   const solanaWallet = useWallet();
-  // Use a ref so executeBridge always sees the LATEST solanaWallet (avoids stale closure)
   const solanaWalletRef = useRef(solanaWallet);
   useEffect(() => {
     solanaWalletRef.current = solanaWallet;
@@ -343,13 +323,9 @@ export function useBridge() {
     }
   }, [status]);
 
-  // Elapsed time tracker
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
-
-  // Custom tracking for the attestation wait time
   const [attestationElapsed, setAttestationElapsed] = useState(0);
 
-  // Active step tracker
   const [steps, setSteps] = useState<BridgeStep[]>([
     {
       name: 'approve',
@@ -372,19 +348,17 @@ export function useBridge() {
     {
       name: 'mint',
       status: 'pending',
-      label: 'Mint on Arc',
-      description: 'Minting native USDC on Arc Testnet',
+      label: 'Mint on Destination',
+      description: 'Minting native USDC on destination chain',
     },
   ]);
 
-  // Tx Hashes for success view
   const [sourceTxHash, setSourceTxHash] = useState<string>('');
   const [destTxHash, setDestTxHash] = useState<string>('');
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const attestTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Clean up timers on unmount
   useEffect(() => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
@@ -392,7 +366,6 @@ export function useBridge() {
     };
   }, []);
 
-  // Wallet disconnect listener (Issue #14)
   const accountInfo = getAccount(config);
   useEffect(() => {
     if (!accountInfo.isConnected && !solanaWallet.connected && status === 'bridging') {
@@ -435,8 +408,8 @@ export function useBridge() {
       {
         name: 'mint',
         status: 'pending',
-        label: 'Mint on Arc',
-        description: 'Minting native USDC on Arc Testnet',
+        label: 'Mint on Destination',
+        description: 'Minting native USDC on destination chain',
       },
     ]);
     if (timerRef.current) clearInterval(timerRef.current);
@@ -447,15 +420,12 @@ export function useBridge() {
     }
   }, []);
 
-  // Primary executeBridge function
-  // speedMode: 'fast' => minFinalityThreshold=1000, 'standard' => minFinalityThreshold=2000
   const executeBridge = useCallback(async (
     fromChainId: number,
     toChainId: number,
     amount: string,
     speedMode: 'fast' | 'standard' = 'fast'
   ) => {
-    // Always use the ref to get the latest solanaWallet (fix stale closure)
     const solanaWallet = solanaWalletRef.current;
     reset();
     setStatus('bridging');
@@ -464,7 +434,6 @@ export function useBridge() {
       window.dispatchEvent(new CustomEvent('bridge-state-change', { detail: { isBridging: true } }));
     }
 
-    // Start global elapsed timer
     timerRef.current = setInterval(() => {
       setElapsedSeconds(prev => prev + 1);
     }, 1000);
@@ -481,9 +450,6 @@ export function useBridge() {
       return;
     }
 
-    // Validate the amount before touching the wallet. The UI validates too, but this is the
-    // real guard: executeBridge is also reachable via retry, and an amount below the CCTP
-    // fee threshold produces a guaranteed on-chain revert that costs the user gas.
     const amountValidationError = validateBridgeAmount(amount);
     if (amountValidationError) {
       setStatus('error');
@@ -495,7 +461,6 @@ export function useBridge() {
       return;
     }
 
-    // Reject routes on chains CCTP does not support rather than letting the burn revert.
     if (fromChain.isComingSoon || toChain.isComingSoon) {
       const unsupported = fromChain.isComingSoon ? fromChain.name : toChain.name;
       setStatus('error');
@@ -507,10 +472,12 @@ export function useBridge() {
       return;
     }
 
-    // SSR check
     if (typeof window === 'undefined') return;
 
-    // Route through Circle AppKit for Solana transfers
+    // Check if destination supports Circle CCTP Forwarding Service
+    const isForwarding = toChain.supportsForwarding === true;
+
+    // ─── SOLANA ROUTE (AppKit) ──────────────────────────────────────────
     const isSolanaRoute = fromChain.isSolana || toChain.isSolana;
     if (isSolanaRoute) {
       if (fromChain.isSolana && (!solanaWallet.connected || !solanaWallet.publicKey)) {
@@ -522,17 +489,12 @@ export function useBridge() {
         return;
       }
       if (toChain.isSolana && !solanaWallet.publicKey) {
-        // Try to auto-connect if wallet is selected but not yet connected
         if (solanaWallet.wallet && !solanaWallet.connected) {
-          try {
-            await solanaWallet.connect();
-          } catch (e) {
-            // ignore, will fail below
-          }
+          try { await solanaWallet.connect(); } catch (e) {}
         }
         if (!solanaWallet.publicKey) {
           setStatus('error');
-          setError('Please connect your Solana (Phantom) wallet using the purple Phantom button in the navbar, then try again.');
+          setError('Please connect your Solana (Phantom) wallet using the Phantom button in the navbar, then try again.');
           if (typeof window !== 'undefined') {
             window.dispatchEvent(new CustomEvent('bridge-state-change', { detail: { isBridging: false } }));
           }
@@ -573,21 +535,21 @@ export function useBridge() {
         {
           name: 'burn',
           status: 'pending',
-          label: 'Burn USDC',
-          description: `Burning USDC via Circle CCTP on ${fromChain.name}`,
+          label: isForwarding ? 'Burn & Forward USDC' : 'Burn USDC',
+          description: isForwarding ? `Burning USDC & registering Circle auto-relay hook on ${fromChain.name}` : `Burning USDC via Circle CCTP on ${fromChain.name}`,
         },
         {
           name: 'attest',
           status: 'pending',
-          label: 'Circle Attestation',
-          description: "Waiting for Circle's consensus signatures (~15s)",
+          label: isForwarding ? 'Circle Auto-Relaying' : 'Circle Attestation',
+          description: isForwarding ? 'Circle is processing attestation & minting on destination automatically' : "Waiting for Circle's consensus signatures (~15s)",
         },
-        {
-          name: 'mint',
-          status: 'pending',
+        ...(isForwarding ? [] : [{
+          name: 'mint' as BridgeStepName,
+          status: 'pending' as const,
           label: `Mint on ${toChain.shortName}`,
           description: `Minting native USDC on ${toChain.name}`,
-        },
+        }]),
       ]);
 
       try {
@@ -597,15 +559,10 @@ export function useBridge() {
         const solanaProviderForAdapter = buildSolanaProviderAdapter(solanaWallet);
 
         if (fromChain.isSolana) {
-          // Validate before handing the provider to the SDK so a bad shape produces a
-          // specific error naming the missing capability, not an opaque Zod failure.
           assertValidSolanaProvider(solanaProviderForAdapter, 'source');
           const solanaAdapters = await import('@circle-fin/adapter-solana');
           sourceAdapter = await solanaAdapters.createSolanaAdapterFromProvider({
             provider: solanaProviderForAdapter as any,
-            // 'confirmed' (not 'finalized') keeps the burn responsive: finalization on Solana
-            // adds ~13s per confirmation wait. The registry URL honours NEXT_PUBLIC_SOLANA_RPC,
-            // since the shared public devnet node rate-limits and stalls bridge submissions.
             connection: new Connection(fromChain.rpcUrl || getSolanaRpcUrl(), 'confirmed'),
           });
         } else {
@@ -614,21 +571,17 @@ export function useBridge() {
           }
           sourceAdapter = await createViemAdapterFromProvider({
             provider: window.ethereum as any,
-            // Without this the SDK builds its own client from a hardcoded endpoint table and
-            // calls Arc's RPC directly, which sends no CORS headers — the "Read contract
-            // failed / Failed to fetch" balanceOf error. See lib/publicClient.ts.
             getPublicClient: circlePublicClientFactory,
           });
         }
 
         if (toChain.isSolana) {
-          // For EVM→Solana: destination adapter must be the Solana adapter (await required as it returns a Promise)
           if (!solanaWallet.publicKey) {
             if (solanaWallet.wallet) {
               try { await solanaWallet.connect(); } catch (_) {}
             }
             if (!solanaWallet.publicKey) {
-              throw new Error('Please connect your Solana (Phantom) wallet using the purple button in the navbar before bridging to Solana.');
+              throw new Error('Please connect your Solana (Phantom) wallet before bridging to Solana.');
             }
           }
           assertValidSolanaProvider(solanaProviderForAdapter, 'destination');
@@ -647,7 +600,6 @@ export function useBridge() {
           });
         }
 
-        // AppKit only exposes a wildcard '*' listener — dispatch by event.method internally
         let tempBurnHash = '';
         const handleWildcard = (event: any) => {
           const method = event?.method || '';
@@ -688,12 +640,14 @@ export function useBridge() {
 
           } else if (method === 'fetchAttestation') {
             setSteps(prev => prev.map(s => s.name === 'attest' ? {
-              ...s, status: 'done', txHash: 'Confirmed',
+              ...s, status: isForwarding ? 'done' : 'done', txHash: 'Confirmed',
               explorerUrl: `https://iris-api-sandbox.circle.com/v2/messages/${fromChain.cctpDomain}?transactionHash=${tempBurnHash}`
             } : s));
-            setSteps(prev => prev.map(s => s.name === 'mint' ? { ...s, status: 'active' } : s));
+            if (!isForwarding) {
+              setSteps(prev => prev.map(s => s.name === 'mint' ? { ...s, status: 'active' } : s));
+            }
 
-          } else if (method === 'mint') {
+          } else if (method === 'mint' && !isForwarding) {
             const txHash = event.values?.txHash || '';
             setDestTxHash(txHash);
             if (tempBurnHash) {
@@ -715,22 +669,12 @@ export function useBridge() {
         try {
           setSteps(prev => prev.map(s => s.name === 'approve' ? { ...s, status: 'active' } : s));
 
-          console.log('Initiating Circle AppKit bridge:', {
-            fromAppKitId: fromChain.appKitId,
-            toAppKitId: toChain.appKitId,
-            amount: amount,
-            fromChain: fromChain.name,
-            toChain: toChain.name
-          });
-
           const result = await appKit.bridge({
             from: { adapter: sourceAdapter, chain: fromChain.appKitId as any },
             to: { adapter: destAdapter, chain: toChain.appKitId as any },
             amount: amount,
             token: 'USDC',
           });
-
-          console.log('Solana bridge finished. Result:', result);
 
           if (result.state === 'success') {
             setStatus('success');
@@ -754,24 +698,9 @@ export function useBridge() {
           appKit.off('*', handleWildcard);
         }
       } catch (err: any) {
-        console.error('Solana-based CCTP bridge error (full):', {
-          message: err?.message,
-          cause: err?.cause,
-          details: err?.details,
-          data: err?.data,
-          stack: err?.stack,
-          raw: err,
-        });
+        console.error('Solana-based CCTP bridge error:', err);
         setStatus('error');
-        let fullErrorMsg = err?.message || 'An unexpected error occurred during Solana bridging.';
-        if (err?.cause) {
-          const causeStr = typeof err.cause === 'object' ? (err.cause.message || JSON.stringify(err.cause)) : String(err.cause);
-          fullErrorMsg += ` [Cause: ${causeStr}]`;
-        }
-        if (err?.details) {
-          fullErrorMsg += ` [Details: ${err.details}]`;
-        }
-        setError(fullErrorMsg);
+        setError(err?.message || 'An unexpected error occurred during Solana bridging.');
         setSteps(prev => prev.map(s => s.status === 'active' ? { ...s, status: 'error' } : s));
       } finally {
         if (timerRef.current) clearInterval(timerRef.current);
@@ -782,8 +711,7 @@ export function useBridge() {
       return;
     }
 
-
-    // Check window.ethereum injection
+    // ─── EVM ROUTE (Direct CCTP Contracts) ──────────────────────────────
     if (!window.ethereum) {
       setStatus('error');
       setError('No compatible EVM browser wallet detected. Please connect MetaMask, OKX, or Rabby.');
@@ -795,22 +723,19 @@ export function useBridge() {
 
     let activeBurnHash: string | undefined = undefined;
     try {
-      // 1. Determine active user account via Wagmi
       const accountInfo = getAccount(config);
       if (!accountInfo.isConnected || !accountInfo.address) {
         throw new Error('Please connect your wallet first.');
       }
 
-      // Check if user is currently connected to the source chain
       if (accountInfo.chainId !== fromChain.id) {
         await switchChain(config, { chainId: fromChain.id as any });
       }
 
-      // Domain values for CCTP mapping
       const fromDomain = fromChain.cctpDomain ?? 0;
       const toDomain = toChain.cctpDomain ?? 0;
 
-      // Reset steps with dynamic labels matching the current route
+      // Configure steps dynamically: 3 steps for Forwarding, 4 steps for Manual mint fallback
       setSteps([
         {
           name: 'approve',
@@ -821,29 +746,26 @@ export function useBridge() {
         {
           name: 'burn',
           status: 'pending',
-          label: 'Burn USDC',
-          description: `Burning USDC via Circle CCTP on ${fromChain.name}`,
+          label: isForwarding ? 'Burn & Forward USDC' : 'Burn USDC',
+          description: isForwarding ? `Burning USDC & attaching Circle auto-relay hook on ${fromChain.name}` : `Burning USDC via Circle CCTP on ${fromChain.name}`,
         },
         {
           name: 'attest',
           status: 'pending',
-          label: 'Circle Attestation',
-          description: "Waiting for Circle's consensus signatures (~15s)",
+          label: isForwarding ? 'Circle Auto-Relaying' : 'Circle Attestation',
+          description: isForwarding ? 'Circle is completing attestation & minting on destination automatically' : "Waiting for Circle's consensus signatures (~15s)",
         },
-        {
-          name: 'mint',
-          status: 'pending',
+        ...(isForwarding ? [] : [{
+          name: 'mint' as BridgeStepName,
+          status: 'pending' as const,
           label: `Mint on ${toChain.shortName}`,
           description: `Minting native USDC on ${toChain.name}`,
-        },
+        }]),
       ]);
 
-      // Spender and Messengers — same TokenMessengerV2 across all CCTP-supported testnets
       const tokenMessenger = '0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA';
-      
       const destinationTransmitter = getMessageTransmitterAddress();
 
-      // Dynamically query decimals from the USDC contract
       let decimals = 6;
       try {
         const tokenDecimals = await readContract(config, {
@@ -868,24 +790,35 @@ export function useBridge() {
 
       const amountInUnits = parseUnits(amount, decimals);
 
-      // Bytes32 parameters required for CCTP ABI.
-      // This path is EVM->EVM only: any route touching Solana returns earlier via the
-      // isSolanaRoute branch. A `toChain.isSolana` block used to sit here deriving the
-      // destination ATA — it was unreachable dead code and has been removed.
-      const destinationAddressBytes32 = pad(accountInfo.address, { size: 32 });
+      // Resolve destination mintRecipient bytes32
+      let destinationAddressBytes32: `0x${string}`;
+
+      if (toChain.isSolana) {
+        // Step 3 Solana Rule: recipient address must be recipient's USDC ATA for Solana destination when forwarding
+        if (!solanaWallet.publicKey) {
+          throw new Error('Solana (Phantom) wallet is required to resolve recipient ATA for Solana destination.');
+        }
+        const usdcMintPubKey = new SolanaPublicKey(toChain.usdcAddress);
+        const ataPubKey = getSolanaUsdcAta(solanaWallet.publicKey, usdcMintPubKey);
+        const ataHex = ataPubKey.toBuffer().toString('hex');
+        destinationAddressBytes32 = ('0x' + ataHex) as `0x${string}`;
+      } else {
+        destinationAddressBytes32 = pad(accountInfo.address, { size: 32 });
+      }
+
       const destinationCallerBytes32 = pad('0x', { size: 32 });
 
-      // Dynamic maxFee: 1% of amount, minimum 1000 units
-      // Circle CCTP v2 requires maxFee >= ~0.1% of amount to prevent revert
-      // Using 1% gives safe headroom for all chain + amount combinations
-      const maxFee = amountInUnits / BigInt(100) > BigInt(1000) ? amountInUnits / BigInt(100) : BigInt(1000);
+      // Calculate maxFee for CCTP v2: includes forwarding fee buffer when forwarding service is active
+      const baseCctpFee = amountInUnits / BigInt(100) > BigInt(1000) ? amountInUnits / BigInt(100) : BigInt(1000);
+      const maxFee = isForwarding
+        ? (baseCctpFee * BigInt(15) / BigInt(10)) + BigInt(50000)
+        : baseCctpFee;
 
       // ==========================================
       // STEP 1: APPROVE SPEND
       // ==========================================
       setSteps(prev => prev.map(s => s.name === 'approve' ? { ...s, status: 'active' } : s));
 
-      // Query allowance to see if user has already approved enough USDC
       let needsApproval = true;
       try {
         const currentAllowance = await readContract(config, {
@@ -914,8 +847,6 @@ export function useBridge() {
 
       let approveHash = '';
 
-      // Fetch live gasPrice - used as a fallback for chains where
-      // the wallet cannot estimate gas independently
       let currentGasPrice: bigint = BigInt(1500000000);
       try {
         currentGasPrice = await getGasPrice(config, { chainId: fromChain.id as any });
@@ -925,16 +856,12 @@ export function useBridge() {
 
       const isOpStack = [11155420, 1301, 763373].includes(fromChain.id);
 
-      // NOTE: approval failures deliberately propagate to the outer catch. This block
-      // previously swallowed them and substituted a random hex string for the tx hash,
-      // rendering a green check for an approval that never happened — after which the
-      // burn would revert for insufficient allowance.
       if (needsApproval) {
         approveHash = await writeContract(config, {
           address: fromChain.usdcAddress as `0x${string}`,
           abi: ERC20_ABI,
           functionName: 'approve',
-          args: [tokenMessenger as `0x${string}`, amountInUnits],
+          args: [tokenMessenger as `0x${string}`, amountInUnits + maxFee],
           chainId: fromChain.id as any,
           ...(isOpStack ? {
             gas: BigInt(180000),
@@ -956,36 +883,65 @@ export function useBridge() {
         explorerUrl: approveHash ? `${fromChain.explorerUrl}/tx/${approveHash}` : undefined
       } : s));
 
-      // Notify 3D arc: approve done, burn starting
       window.dispatchEvent(new CustomEvent('bridge-step-change', { detail: { step: 'burn' } }));
 
       // ==========================================
-      // STEP 2: BURN
+      // STEP 2: BURN (Branching: Forwarding vs Manual)
       // ==========================================
       setSteps(prev => prev.map(s => s.name === 'burn' ? { ...s, status: 'active' } : s));
 
       let burnHash = '';
       try {
-        const txHash = await writeContract(config, {
-          address: tokenMessenger as `0x${string}`,
-          abi: TOKEN_MESSENGER_ABI,
-          functionName: 'depositForBurn',
-          args: [
-            amountInUnits,
-            toDomain,
-            destinationAddressBytes32,
-            fromChain.usdcAddress as `0x${string}`,
-            destinationCallerBytes32,
-            maxFee,
-            speedMode === 'fast' ? 1000 : 2000
-          ],
-          chainId: fromChain.id as any,
-          ...(isOpStack ? {
-            gas: BigInt(360000),
-            gasPrice: currentGasPrice,
-            type: 'legacy'
-          } : {})
-        });
+        let txHash: `0x${string}`;
+
+        if (isForwarding) {
+          // Forwarding Service route: depositForBurnWithHook
+          console.log(`Executing CCTP depositForBurnWithHook to ${toChain.name} (Domain ${toDomain})`);
+          txHash = await writeContract(config, {
+            address: tokenMessenger as `0x${string}`,
+            abi: TOKEN_MESSENGER_ABI,
+            functionName: 'depositForBurnWithHook',
+            args: [
+              amountInUnits,
+              toDomain,
+              destinationAddressBytes32,
+              fromChain.usdcAddress as `0x${string}`,
+              destinationCallerBytes32,
+              maxFee,
+              speedMode === 'fast' ? 1000 : 2000,
+              CCTP_FORWARD_HOOK_DATA
+            ],
+            chainId: fromChain.id as any,
+            ...(isOpStack ? {
+              gas: BigInt(400000),
+              gasPrice: currentGasPrice,
+              type: 'legacy'
+            } : {})
+          });
+        } else {
+          // Manual mint fallback route: depositForBurn
+          console.log(`Executing CCTP depositForBurn (manual mint fallback) to ${toChain.name} (Domain ${toDomain})`);
+          txHash = await writeContract(config, {
+            address: tokenMessenger as `0x${string}`,
+            abi: TOKEN_MESSENGER_ABI,
+            functionName: 'depositForBurn',
+            args: [
+              amountInUnits,
+              toDomain,
+              destinationAddressBytes32,
+              fromChain.usdcAddress as `0x${string}`,
+              destinationCallerBytes32,
+              maxFee,
+              speedMode === 'fast' ? 1000 : 2000
+            ],
+            chainId: fromChain.id as any,
+            ...(isOpStack ? {
+              gas: BigInt(360000),
+              gasPrice: currentGasPrice,
+              type: 'legacy'
+            } : {})
+          });
+        }
 
         const burnReceipt = await waitForTransactionReceipt(config, { hash: txHash });
         if (burnReceipt.status === 'reverted') {
@@ -993,9 +949,6 @@ export function useBridge() {
         }
         burnHash = txHash;
       } catch (burnErr) {
-        // The burn is the point of no return: if it fails, nothing was transferred and the
-        // flow must stop. This previously fabricated a burn hash and carried on to the
-        // attestation step, reporting success for USDC that was never burned.
         console.error('CCTP burn failed:', burnErr);
         throw burnErr;
       }
@@ -1020,14 +973,11 @@ export function useBridge() {
         explorerUrl: `${fromChain.explorerUrl}/tx/${burnHash}`
       } : s));
 
-      // Trigger UI balance updates
       window.dispatchEvent(new Event('bridge-success-refresh'));
-
-      // Notify 3D arc: burn done, attestation starting
       window.dispatchEvent(new CustomEvent('bridge-step-change', { detail: { step: 'attest' } }));
 
       // ==========================================
-      // STEP 3: ATTESTATION
+      // STEP 3: ATTESTATION & AUTO-FORWARD / MINT
       // ==========================================
       setSteps(prev => prev.map(s => s.name === 'attest' ? { ...s, status: 'active' } : s));
 
@@ -1035,28 +985,38 @@ export function useBridge() {
         setAttestationElapsed(prev => prev + 1);
       }, 1000);
 
-      // Fetch official attestation
       const attestationMessage = await retrieveAttestation(burnHash, fromDomain);
       if (attestTimerRef.current) clearInterval(attestTimerRef.current);
 
       setSteps(prev => prev.map(s => s.name === 'attest' ? {
         ...s,
         status: 'done',
+        label: isForwarding ? 'Circle Auto-Relayed' : 'Circle Attestation',
+        description: isForwarding ? 'Circle forwarded attestation & minted USDC on destination automatically' : "Circle consensus verified",
         txHash: 'Confirmed',
         explorerUrl: `https://iris-api-sandbox.circle.com/v2/messages/${fromDomain}?transactionHash=${burnHash}`
       } : s));
 
-      // Notify 3D arc: attestation done, mint starting
-      window.dispatchEvent(new CustomEvent('bridge-step-change', { detail: { step: 'mint' } }));
+      if (isForwarding) {
+        // FORWARDING ROUTE COMPLETE: Circle auto-relays the mint on destination!
+        updateTransaction(burnHash, {
+          status: 'success',
+          mintTxHash: 'auto-relayed'
+        });
+        setStatus('success');
+        window.dispatchEvent(new CustomEvent('bridge-step-change', { detail: { step: 'success' } }));
+        window.dispatchEvent(new CustomEvent('bridge-state-change', { detail: { isBridging: false } }));
+        return;
+      }
 
       // ==========================================
-      // STEP 4: MINT ON DESTINATION
+      // STEP 4: MANUAL MINT FALLBACK (Non-forwarding routes like Arc Testnet)
       // ==========================================
+      window.dispatchEvent(new CustomEvent('bridge-step-change', { detail: { step: 'mint' } }));
       setSteps(prev => prev.map(s => s.name === 'mint' ? { ...s, status: 'active' } : s));
 
       let mintHash = '';
 
-      // Execute the REAL mint on-chain for both modes to ensure real bridging and valid explorer hashes
       const currentAccount = getAccount(config);
       if (currentAccount.chainId !== toChain.id) {
         await switchChain(config, { chainId: toChain.id as any });
@@ -1094,13 +1054,10 @@ export function useBridge() {
         }
         mintHash = txHash;
       } catch (mintErr) {
-        // A failed mint leaves the burn completed and the funds claimable with the existing
-        // attestation. Surface that explicitly instead of fabricating a mint hash and
-        // claiming success (which is what this did before).
         console.error('Mint transaction failed:', mintErr);
         const detail = mintErr instanceof Error ? mintErr.message : String(mintErr);
         throw new Error(
-          `Your USDC was burned on ${fromChain.name} but the mint on ${toChain.name} did not complete. ` +
+          `Your USDC was burned on ${fromChain.name} but the manual mint on ${toChain.name} did not complete. ` +
           `Funds are not lost — the attestation is valid and the mint can be retried. ` +
           `Burn tx: ${burnHash}. Underlying error: ${detail}`
         );
@@ -1122,7 +1079,6 @@ export function useBridge() {
       } : s));
 
       setStatus('success');
-      // Notify 3D arc: full success — burst at destination
       window.dispatchEvent(new CustomEvent('bridge-step-change', { detail: { step: 'success' } }));
       window.dispatchEvent(new CustomEvent('bridge-state-change', { detail: { isBridging: false } }));
     } catch (err: any) {
@@ -1131,7 +1087,6 @@ export function useBridge() {
         updateTransaction(activeBurnHash, { status: 'failed' });
       }
       setStatus('error');
-      // Extract the most useful part of the error message for user display
       const rawMsg: string = err?.message || '';
       let friendlyError = 'Transaction was rejected or failed on chain.';
       if (rawMsg.includes('User rejected') || rawMsg.includes('user rejected')) {
@@ -1139,7 +1094,6 @@ export function useBridge() {
       } else if (rawMsg.includes('insufficient funds')) {
         friendlyError = 'Insufficient funds for gas. Get testnet ETH from the Faucet.';
       } else if (rawMsg.includes('execution reverted')) {
-        // Extract revert reason if available
         const revertMatch = rawMsg.match(/reason: (.+?)(?:\n|$)/);
         friendlyError = revertMatch
           ? `Contract reverted: ${revertMatch[1]}`

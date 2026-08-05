@@ -1,11 +1,11 @@
 // components/bridge/ChainPicker.tsx
-// Dropdown chain picker component styled as a premium rounded-full Relay-link pill (Supports dark/light theme)
+// Dropdown chain picker component styled as a premium rounded-full Relay-link pill with Forwarding Service capability badges
 
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronRight, Check, Search } from 'lucide-react';
+import { ChevronRight, Check, Search, Zap, Lock } from 'lucide-react';
 import { SUPPORTED_CHAINS, ChainMetadata } from '../../constants/chains';
 import { measureChainLatency } from '../../lib/rpcClient';
 
@@ -28,7 +28,6 @@ export default function ChainPicker({
   const [searchQuery, setSearchQuery] = useState('');
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Close on click outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -41,19 +40,12 @@ export default function ChainPicker({
 
   const [latencies, setLatencies] = useState<Record<number, number>>({});
 
-  // Dynamic real-time latency checks when picker is opened
   useEffect(() => {
     if (!isOpen) return;
 
     const activeChains = SUPPORTED_CHAINS.filter(c => !c.isComingSoon && !c.isSolana);
-
-    // Probing stops when the picker closes, so a stale batch can't overwrite fresh readings.
     let isCancelled = false;
 
-    // measureChainLatency goes through the shared client, which honours the endpoint
-    // registry and the /api/rpc proxy. Probing chain.rpcUrl directly (as this did before)
-    // meant Arc was reported as "off" purely because the browser blocked it on CORS, even
-    // though the node was healthy.
     activeChains.forEach(async (chain) => {
       const latency = await measureChainLatency(chain.id);
       if (!isCancelled) {
@@ -71,19 +63,16 @@ export default function ChainPicker({
     setSearchQuery('');
   };
 
-  // Filter chains — exclude Arc Testnet from FROM picker, exclude non-arc from TO picker  
   const filteredChains = SUPPORTED_CHAINS.filter(chain =>
     chain.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     chain.shortName.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Group: Active (EVM + Solana), Coming Soon
-  const activeChains    = filteredChains.filter(c => !c.isComingSoon);
-  const comingSoonChains   = filteredChains.filter(c => c.isComingSoon);
+  const activeChains = filteredChains.filter(c => !c.isComingSoon);
+  const comingSoonChains = filteredChains.filter(c => c.isComingSoon);
 
   const isDark = theme === 'dark';
 
-  // Dynamic theme mappings
   const buttonStyle = isDark 
     ? 'bg-[#0F172A] hover:bg-[#182235] border-[#1E293B] text-white' 
     : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-900 shadow-sm';
@@ -115,7 +104,6 @@ export default function ChainPicker({
         style={{ outline: 'none' }}
       >
         <div className="flex items-center gap-2 text-left">
-          {/* Chain Logo */}
           <div className="relative h-6 w-6 rounded-full bg-[#10B981]/15 p-[1.5px] flex-shrink-0">
             <img
               src={selectedChain.iconUrl}
@@ -125,14 +113,24 @@ export default function ChainPicker({
                 (e.target as HTMLElement).style.display = 'none';
               }}
             />
-            {/* Small USDC corner badge */}
             <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-blue-600 border border-slate-950 flex items-center justify-center text-[5px] text-white font-bold font-mono">
               $
             </span>
           </div>
           
           <div className="flex flex-col select-none">
-            <span className={`font-bold text-[12px] leading-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>USDC</span>
+            <div className="flex items-center gap-1">
+              <span className={`font-bold text-[12px] leading-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>USDC</span>
+              {selectedChain.supportsForwarding ? (
+                <span className="inline-flex items-center gap-0.5 text-[8px] font-black text-[#10B981] bg-[#10B981]/15 px-1 rounded uppercase tracking-wider">
+                  <Zap className="h-2 w-2" /> 1-Step
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-0.5 text-[8px] font-semibold text-slate-400 bg-slate-500/10 px-1 rounded uppercase tracking-wider">
+                  <Lock className="h-2 w-2" /> 2-Step
+                </span>
+              )}
+            </div>
             <span className={`${textMuted} text-[10px] font-medium leading-none`}>{selectedChain.shortName}</span>
           </div>
         </div>
@@ -165,7 +163,6 @@ export default function ChainPicker({
             {/* List */}
             <div className="max-h-72 overflow-y-auto custom-scrollbar">
 
-              {/* Active chains */}
               {activeChains.length > 0 && (
                 <>
                   <p className={`px-2 py-1 text-[9px] font-black uppercase tracking-wider ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>
@@ -200,11 +197,17 @@ export default function ChainPicker({
                                 <span className="inline-flex items-center rounded-full bg-emerald-950/40 border border-emerald-900/30 px-1 text-[8px] font-semibold text-[#10B981]">Native</span>
                               )}
                             </span>
-                            {chain.isSolana ? (
-                              <span className={`${isDark ? 'text-slate-500' : 'text-slate-400'} text-[9px] font-medium`}>Non-EVM</span>
-                            ) : (
-                              <span className={`${isDark ? 'text-slate-500' : 'text-slate-400'} text-[9px] font-medium`}>Chain ID: {chain.id}</span>
-                            )}
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              {chain.supportsForwarding ? (
+                                <span className="text-[8px] font-black text-[#10B981] flex items-center gap-0.5">
+                                  <Zap className="h-2 w-2" /> 1-Step Auto-Relay
+                                </span>
+                              ) : (
+                                <span className="text-[8px] font-medium text-slate-400 flex items-center gap-0.5">
+                                  <Lock className="h-2 w-2" /> 2-Step Manual Mint
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
@@ -232,7 +235,6 @@ export default function ChainPicker({
                 </>
               )}
 
-              {/* Coming Soon */}
               {comingSoonChains.length > 0 && (
                 <>
                   <p className={`px-2 pt-2 pb-1 text-[9px] font-black uppercase tracking-wider ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>
@@ -243,7 +245,7 @@ export default function ChainPicker({
                       key={chain.appKitId}
                       type="button"
                       disabled
-                      className={`flex w-full items-center justify-between rounded-[8px] px-2.5 py-2 text-left text-xs font-semibold mb-0.5 opacity-45 cursor-not-allowed`}
+                      className="flex w-full items-center justify-between rounded-[8px] px-2.5 py-2 text-left text-xs font-semibold mb-0.5 opacity-45 cursor-not-allowed"
                     >
                       <div className="flex items-center gap-2">
                         <div className="h-5 w-5 rounded-full bg-slate-500/10 p-[1px] flex-shrink-0" style={{ minWidth: 20 }}>

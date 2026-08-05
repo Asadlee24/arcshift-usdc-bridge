@@ -1,5 +1,5 @@
 import React from 'react';
-import { Check, X, Loader2, ExternalLink, Activity } from 'lucide-react';
+import { Check, X, Loader2, ExternalLink, Activity, Zap, Lock } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { BridgeStep } from '../../hooks/useBridge';
 
@@ -37,6 +37,8 @@ export default function StepTracker({
   const borderLineBase = isDark ? 'bg-slate-800' : 'bg-slate-200';
   const linkBg = isDark ? 'bg-[#131B2E] border-[#1E293B] text-slate-400 hover:text-white hover:border-[#10B981]' : 'bg-slate-50 border-slate-200 text-slate-600 hover:text-slate-900 hover:border-[#10B981]';
 
+  const isForwardingRoute = steps.length === 3;
+
   const getEstDuration = (chainName: string): { duration: number; speed: string } => {
     const name = chainName.toLowerCase();
     if (name.includes('ethereum')) return { duration: 30, speed: 'Medium (Sepolia L1)' };
@@ -57,7 +59,7 @@ export default function StepTracker({
   return (
     <div className="w-full flex flex-col select-none py-1">
       
-      {/* Header with High-Tech Pulsing Radar Indicator */}
+      {/* Header */}
       <div className={`flex items-center justify-between pb-4 mb-4 border-b ${dividerBorder}`}>
         <div>
           <div className="flex items-center gap-1.5">
@@ -65,6 +67,15 @@ export default function StepTracker({
             <h3 className={`text-sm font-black tracking-wide ${textPrimary} uppercase`}>
               {isSwap ? 'Swapping Assets' : 'Bridging Assets'}
             </h3>
+            {isForwardingRoute ? (
+              <span className="text-[9px] font-black text-[#10B981] bg-[#10B981]/15 px-2 py-0.5 rounded-full border border-[#10B981]/30 flex items-center gap-0.5 ml-2">
+                <Zap className="h-2.5 w-2.5" /> Circle Auto-Relay
+              </span>
+            ) : (
+              <span className="text-[9px] font-semibold text-slate-400 bg-slate-500/10 px-2 py-0.5 rounded-full border border-slate-500/20 flex items-center gap-0.5 ml-2">
+                <Lock className="h-2.5 w-2.5" /> 2-Step Mint
+              </span>
+            )}
           </div>
           <p className={`text-[11px] font-semibold ${textMuted} mt-0.5`}>
             {isSwap ? (
@@ -83,9 +94,8 @@ export default function StepTracker({
         </div>
       </div>
 
-      {/* High-Tech Progress Banner with Pulsing Scanline */}
+      {/* Progress Banner */}
       <div className={`mb-5 p-4 rounded-2xl border relative overflow-hidden ${isDark ? 'bg-[#0B1221] border-[#1E293B] shadow-[0_0_20px_rgba(16,185,129,0.02)]' : 'bg-slate-50 border-slate-200'}`}>
-        {/* Futuristic Laser Light Scan effect */}
         <div className="absolute top-0 bottom-0 left-0 w-[80px] bg-gradient-to-r from-transparent via-[#10B981]/15 to-transparent pointer-events-none animate-scanline" />
 
         <div className="flex items-center justify-between mb-2">
@@ -98,7 +108,6 @@ export default function StepTracker({
           </span>
         </div>
         
-        {/* Progress bar container */}
         <div className={`w-full h-2 rounded-full overflow-hidden relative ${isDark ? 'bg-slate-800' : 'bg-slate-200'}`}>
           <motion.div 
             className="h-full bg-gradient-to-r from-blue-500 via-emerald-400 to-[#10B981] rounded-full shadow-[0_0_8px_rgba(16,185,129,0.5)]"
@@ -108,14 +117,13 @@ export default function StepTracker({
           />
         </div>
         
-        {/* Dynamic labels */}
         <div className="flex justify-between items-center mt-2 text-[10px] font-semibold">
           <span className={textMuted}>Speed Profile: {speedLabel}</span>
           <span className="text-[#10B981] font-black font-mono">{Math.round(progressPercent)}%</span>
         </div>
       </div>
 
-      {/* Vertically Animated Step Nodes */}
+      {/* Animated Step Nodes */}
       <div className="flex flex-col">
         {steps.map((step, idx) => {
           const isPending = step.status === 'pending';
@@ -125,24 +133,20 @@ export default function StepTracker({
 
           let subText = step.description;
           if (isActive && step.name === 'attest') {
-            subText = `Verifying signatures from Circle Attestation network... ${attestationElapsed}s`;
+            subText = isForwardingRoute
+              ? `Circle is attesting burn & auto-minting on destination... ${attestationElapsed}s`
+              : `Verifying signatures from Circle Attestation network... ${attestationElapsed}s`;
           }
 
           return (
             <div key={step.name} className="flex gap-4 relative">
               
-              {/* Left Column: Circle & Line Segment */}
               <div className="flex flex-col items-center relative flex-shrink-0">
-                
-                {/* Step Circle with Multi-layered Pulsing Animations */}
                 <div className="relative h-[30px] w-[30px] flex items-center justify-center">
-                  
-                  {/* Active pulsing ring */}
                   {isActive && (
                     <span className="absolute inset-0 rounded-full bg-[#10B981]/20 border border-[#10B981]/60 animate-ping" />
                   )}
 
-                  {/* Node Circle */}
                   <motion.div
                     initial={{ scale: 0.8 }}
                     animate={{ scale: isDone ? [1, 1.2, 1] : 1 }}
@@ -169,10 +173,8 @@ export default function StepTracker({
                   </motion.div>
                 </div>
 
-                {/* Connecting Line Segment with active progress fill */}
                 {idx < steps.length - 1 && (
                   <div className={`absolute top-[30px] bottom-0 w-[2.5px] rounded-full ${borderLineBase}`}>
-                    {/* Active dynamic filled line */}
                     {(isDone || (isActive && idx === 0)) && (
                       <motion.div
                         initial={{ height: '0%' }}
@@ -185,7 +187,6 @@ export default function StepTracker({
                 )}
               </div>
 
-              {/* Right Column: Text & Content with Slide-in Transition */}
               <motion.div 
                 initial={{ opacity: 0, x: 10 }}
                 animate={{ opacity: 1, x: 0 }}
@@ -199,7 +200,6 @@ export default function StepTracker({
                   {subText}
                 </span>
 
-                {/* Transaction Hash Badge */}
                 {isDone && step.txHash && step.explorerUrl && (
                   <motion.a
                     initial={{ opacity: 0, y: 5 }}
@@ -219,7 +219,6 @@ export default function StepTracker({
         })}
       </div>
 
-      {/* Error block with shake alert */}
       {error && (
         <motion.div 
           initial={{ x: [-10, 10, -10, 10, 0] }}
@@ -230,7 +229,7 @@ export default function StepTracker({
             !
           </div>
           <div className="flex flex-col">
-            <span className={`font-black ${isDark ? 'text-red-400' : 'text-red-600'} uppercase tracking-wide`}>Transaction Reverted</span>
+            <span className={`font-black ${isDark ? 'text-red-400' : 'text-red-600'} uppercase tracking-wide`}>Transaction Error</span>
             <span className={`${isDark ? 'text-slate-400' : 'text-slate-500'} mt-0.5 leading-relaxed font-semibold`}>{error}</span>
           </div>
         </motion.div>

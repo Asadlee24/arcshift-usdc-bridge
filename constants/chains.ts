@@ -1,15 +1,10 @@
 // constants/chains.ts
 // Arc-supported USDC Bridge Chain Configurations — All BridgeChain enum chains from Arc docs
 // EVM chains: fully functional CCTP.
-//
-// RPC URLs are no longer hardcoded here. They come from lib/rpcEndpoints.ts, which holds a
-// single health-ordered list per chain (with CORS-blocked endpoints routed through
-// /api/rpc). Several URLs previously hardcoded in this file are dead — see that file.
 
 import { getPrimaryRpcUrl, getSolanaRpcUrl } from '../lib/rpcEndpoints';
 
 export interface ChainMetadata {
-
   id: number;
   appKitId: string;        // BridgeChain enum value from @circle-fin/app-kit
   name: string;
@@ -23,6 +18,7 @@ export interface ChainMetadata {
   cctpDomain?: number;
   isComingSoon?: boolean;  // Non-EVM or chains without MetaMask support
   isSolana?: boolean;      // Requires separate Solana adapter
+  supportsForwarding: boolean; // Circle CCTP Forwarding Service capability status for destination
 }
 
 export const SUPPORTED_CHAINS: ChainMetadata[] = [
@@ -38,8 +34,8 @@ export const SUPPORTED_CHAINS: ChainMetadata[] = [
     rpcUrl: getPrimaryRpcUrl(5042002),
     usdcAddress: '0x3600000000000000000000000000000000000000',
     isNativeArc: true,
-
     cctpDomain: 26,
+    supportsForwarding: false, // Arc Testnet forwarding service is unconfirmed; default to manual mint fallback
   },
 
   // ─── STABLE EVM CHAINS ──────────────────────────────────────────
@@ -52,13 +48,10 @@ export const SUPPORTED_CHAINS: ChainMetadata[] = [
     color: '#627EEA',
     explorerUrl: 'https://sepolia.etherscan.io',
     rpcUrl: getPrimaryRpcUrl(11155111),
-    // Circle's canonical CCTP USDC on Ethereum Sepolia.
     usdcAddress: '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238',
     isNativeArc: false,
     cctpDomain: 0,
-    // Now live. Previously flagged isComingSoon because its RPCs (rpc.sepolia.org -> 404,
-    // eth-sepolia.public.blastapi.io -> 403) were dead, so every read failed. Both are
-    // replaced in lib/rpcEndpoints.ts with healthy endpoints.
+    supportsForwarding: true,
   },
 
   {
@@ -70,10 +63,10 @@ export const SUPPORTED_CHAINS: ChainMetadata[] = [
     color: '#0052FF',
     explorerUrl: 'https://sepolia.basescan.org',
     rpcUrl: getPrimaryRpcUrl(84532),
-
     usdcAddress: '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
     isNativeArc: false,
     cctpDomain: 6,
+    supportsForwarding: true,
   },
   {
     id: 421614,
@@ -87,6 +80,7 @@ export const SUPPORTED_CHAINS: ChainMetadata[] = [
     usdcAddress: '0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d',
     isNativeArc: false,
     cctpDomain: 3,
+    supportsForwarding: true,
   },
   {
     id: 43113,
@@ -100,6 +94,7 @@ export const SUPPORTED_CHAINS: ChainMetadata[] = [
     usdcAddress: '0x5425890298aed601595a70AB815c96711a31Bc65',
     isNativeArc: false,
     cctpDomain: 1,
+    supportsForwarding: true,
   },
   {
     id: 11155420,
@@ -113,6 +108,7 @@ export const SUPPORTED_CHAINS: ChainMetadata[] = [
     usdcAddress: '0x5fd84259d66Cd46123540766Be93DFE6D43130D7',
     isNativeArc: false,
     cctpDomain: 2,
+    supportsForwarding: true,
   },
 
   {
@@ -127,6 +123,7 @@ export const SUPPORTED_CHAINS: ChainMetadata[] = [
     usdcAddress: '0xFEce4462D57bD51A6A552365A011b95f0E16d9B7',
     isNativeArc: false,
     cctpDomain: 11,
+    supportsForwarding: true,
   },
   {
     id: 80002,
@@ -140,9 +137,10 @@ export const SUPPORTED_CHAINS: ChainMetadata[] = [
     usdcAddress: '0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582',
     isNativeArc: false,
     cctpDomain: 7,
+    supportsForwarding: true,
   },
 
-  // ─── NEW EVM CHAINS (All fully enabled as requested) ─────────────
+  // ─── NEW EVM CHAINS ─────────────
 
   {
     id: 1301,
@@ -156,6 +154,7 @@ export const SUPPORTED_CHAINS: ChainMetadata[] = [
     usdcAddress: '0x31d0220469e10c4E71834a79b1f276d740d3768F',
     isNativeArc: false,
     cctpDomain: 10,
+    supportsForwarding: true,
   },
   {
     id: 14601,
@@ -169,6 +168,7 @@ export const SUPPORTED_CHAINS: ChainMetadata[] = [
     usdcAddress: '0x0BA304580ee7c9a980CF72e55f5Ed2E9fd30Bc51',
     isNativeArc: false,
     cctpDomain: 13,
+    supportsForwarding: true,
   },
   {
     id: 998,
@@ -182,6 +182,7 @@ export const SUPPORTED_CHAINS: ChainMetadata[] = [
     usdcAddress: '0x2B3370eE501B4a559b57D449569354196457D8Ab',
     isNativeArc: false,
     cctpDomain: 19,
+    supportsForwarding: true,
   },
   {
     id: 10143,
@@ -194,7 +195,8 @@ export const SUPPORTED_CHAINS: ChainMetadata[] = [
     rpcUrl: getPrimaryRpcUrl(10143),
     usdcAddress: '0x534b2f3A21130d7a60830c2Df862319e593943A3',
     isNativeArc: false,
-    cctpDomain: 15, // Corrected from 12 to 15
+    cctpDomain: 15,
+    supportsForwarding: true,
   },
   {
     id: 763373,
@@ -208,6 +210,7 @@ export const SUPPORTED_CHAINS: ChainMetadata[] = [
     usdcAddress: '0xFabab97dCE620294D2B0b0e46C68964e326300Ac',
     isNativeArc: false,
     cctpDomain: 21,
+    supportsForwarding: true,
   },
   {
     id: 1328,
@@ -218,9 +221,10 @@ export const SUPPORTED_CHAINS: ChainMetadata[] = [
     color: '#9C1C44',
     explorerUrl: 'https://seitrace.com/?chain=atlantic-2',
     rpcUrl: getPrimaryRpcUrl(1328),
-    usdcAddress: '0x4fCF1784B31630811181f670Aea7A7bEF803eaED', // Corrected
+    usdcAddress: '0x4fCF1784B31630811181f670Aea7A7bEF803eaED',
     isNativeArc: false,
     cctpDomain: 16,
+    supportsForwarding: true,
   },
   {
     id: 4801,
@@ -231,9 +235,10 @@ export const SUPPORTED_CHAINS: ChainMetadata[] = [
     color: '#191C1F',
     explorerUrl: 'https://worldchain-sepolia.explorer.alchemy.com',
     rpcUrl: getPrimaryRpcUrl(4801),
-    usdcAddress: '0x66145f38cBAC35Ca6F1Dfb4914dF98F1614aeA88', // Corrected
+    usdcAddress: '0x66145f38cBAC35Ca6F1Dfb4914dF98F1614aeA88',
     isNativeArc: false,
     cctpDomain: 14,
+    supportsForwarding: true,
   },
   {
     id: 688689,
@@ -244,9 +249,10 @@ export const SUPPORTED_CHAINS: ChainMetadata[] = [
     color: '#E8B84B',
     explorerUrl: 'https://atlantic.pharosscan.xyz',
     rpcUrl: getPrimaryRpcUrl(688689),
-    usdcAddress: '0xcfc8330f4bcab529c625d12781b1c19466a9fc8b', // Corrected to active address
+    usdcAddress: '0xcfc8330f4bcab529c625d12781b1c19466a9fc8b',
     isNativeArc: false,
-    cctpDomain: 31, // Corrected to 31
+    cctpDomain: 31,
+    supportsForwarding: false,
   },
   {
     id: 656476,
@@ -260,6 +266,7 @@ export const SUPPORTED_CHAINS: ChainMetadata[] = [
     usdcAddress: '0x6d7f141b6819C2c9CC2f818e6ad549E7Ca090F8f',
     isNativeArc: false,
     cctpDomain: 12,
+    supportsForwarding: true,
   },
   {
     id: 3456,
@@ -273,6 +280,7 @@ export const SUPPORTED_CHAINS: ChainMetadata[] = [
     usdcAddress: '0x2d9F7CAD728051AA35Ecdc472a14cf8cDF5CFD6B',
     isNativeArc: false,
     cctpDomain: 28,
+    supportsForwarding: true,
   },
   {
     id: 1439,
@@ -286,6 +294,7 @@ export const SUPPORTED_CHAINS: ChainMetadata[] = [
     usdcAddress: '0x0C382e685bbeeFE5d3d9C29e29E341fEE8E84C5d',
     isNativeArc: false,
     cctpDomain: 29,
+    supportsForwarding: false,
   },
   {
     id: 2810,
@@ -299,10 +308,8 @@ export const SUPPORTED_CHAINS: ChainMetadata[] = [
     usdcAddress: '0xCfb1186F4e93D60E60a8bDd997427D1F33bc372B',
     isNativeArc: false,
     cctpDomain: 30,
-    // Every published Morph Holesky RPC (rpc-holesky.morphl2.io and the QuickNode mirror)
-    // is currently unreachable, so balances and burns cannot work. Hidden until an
-    // endpoint comes back rather than letting users start a transfer that must fail.
     isComingSoon: true,
+    supportsForwarding: false,
   },
   {
     id: 98867,
@@ -316,6 +323,7 @@ export const SUPPORTED_CHAINS: ChainMetadata[] = [
     usdcAddress: '0xcB5f30e335672893c7eb944B374c196392C19D18',
     isNativeArc: false,
     cctpDomain: 22,
+    supportsForwarding: true,
   },
   {
     id: 51,
@@ -329,6 +337,7 @@ export const SUPPORTED_CHAINS: ChainMetadata[] = [
     usdcAddress: '0xb5AB69F7bBada22B28e79C8FFAECe55eF1c771D4',
     isNativeArc: false,
     cctpDomain: 18,
+    supportsForwarding: true,
   },
 
   // ─── NON-EVM CHAINS (needs Solana adapter) ───────────────────────
@@ -345,6 +354,7 @@ export const SUPPORTED_CHAINS: ChainMetadata[] = [
     isNativeArc: false,
     cctpDomain: 5,
     isSolana: true,
+    supportsForwarding: true,
   },
 ];
 
@@ -364,4 +374,3 @@ export const getSourceChains = (): ChainMetadata[] =>
 // Active source chains available in ChainPicker (no isComingSoon)
 export const getActiveSourceChains = (): ChainMetadata[] =>
   SUPPORTED_CHAINS.filter(c => !c.isNativeArc && !c.isComingSoon);
-

@@ -5,7 +5,8 @@
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, ChevronUp, Zap, Clock, Shield, Info, AlertCircle } from 'lucide-react';
+import { ChevronDown, ChevronUp, Zap, Clock, Lock } from 'lucide-react';
+import { getChainById } from '../../constants/chains';
 
 export type SpeedMode = 'fast' | 'standard';
 
@@ -18,7 +19,6 @@ interface FeeBreakdownPanelProps {
   theme?: 'dark' | 'light';
 }
 
-// Realistic CCTP fee estimates per chain
 const GAS_FEE_ESTIMATES: Record<number, string> = {
   11155111: '~$0.80',  // Ethereum Sepolia
   84532:    '~$0.02',  // Base Sepolia
@@ -28,7 +28,6 @@ const GAS_FEE_ESTIMATES: Record<number, string> = {
   59141:    '~$0.06',  // Linea Sepolia
   80002:    '~$0.02',  // Polygon Amoy
   5042002:  '~$0.01',  // Arc Testnet
-  // New chains
   1301:     '~$0.01',  // Unichain Sepolia
   14601:    '~$0.01',  // Sonic Testnet
   998:      '~$0.01',  // HyperEVM Testnet
@@ -77,20 +76,6 @@ const FINALITY_TIME: Record<SpeedMode, Record<number, string>> = {
   }
 };
 
-function calcCctpFee(amount: string): string {
-  const num = parseFloat(amount || '0');
-  if (num <= 0) return '$0.00';
-  const fee = Math.max(num * 0.01, 0.001); // 1% or min 0.001
-  return `$${fee.toFixed(4)}`;
-}
-
-function calcTotalReceived(amount: string): string {
-  const num = parseFloat(amount || '0');
-  if (num <= 0) return '0.00';
-  const fee = Math.max(num * 0.01, 0.001);
-  return (num - fee).toFixed(4);
-}
-
 export default function FeeBreakdownPanel({
   amount,
   fromChainId,
@@ -102,6 +87,9 @@ export default function FeeBreakdownPanel({
   const [expanded, setExpanded] = useState(false);
   const isDark = theme === 'dark';
 
+  const toChain = getChainById(toChainId);
+  const isForwarding = toChain?.supportsForwarding === true;
+
   const hasAmount = parseFloat(amount || '0') > 0;
 
   const borderColor = isDark ? 'border-[#1E293B]' : 'border-slate-200';
@@ -111,7 +99,7 @@ export default function FeeBreakdownPanel({
   const dividerColor = isDark ? 'border-[#1E293B]' : 'border-slate-200';
 
   const srcGas = GAS_FEE_ESTIMATES[fromChainId] ?? '~$0.05';
-  const dstGas = DEST_GAS_ESTIMATES[toChainId] ?? '~$0.01';
+  const dstGas = isForwarding ? '$0.00 (Forwarded)' : (DEST_GAS_ESTIMATES[toChainId] ?? '~$0.01');
   
   const totalFee = hasAmount ? Math.max(parseFloat(amount) * 0.01, 0.001) : 0;
   const receivedVal = hasAmount ? Math.max(parseFloat(amount) - totalFee, 0) : 0;
@@ -119,8 +107,8 @@ export default function FeeBreakdownPanel({
   const cctpFeeDisplay = hasAmount ? `$${totalFee.toFixed(4)}` : '~1%';
   const receivedDisplay = hasAmount ? receivedVal.toFixed(4) : '–';
   
-  // Parse gas estimates to compute total estimated fee
   const parseGas = (gasStr: string) => {
+    if (gasStr.includes('Forwarded')) return 0;
     return parseFloat(gasStr.replace('~$', '').trim()) || 0;
   };
   const srcGasVal = parseGas(srcGas);
@@ -133,7 +121,7 @@ export default function FeeBreakdownPanel({
   return (
     <div className={`rounded-[14px] border ${borderColor} ${bgColor} overflow-hidden mb-3 transition-all duration-200`}>
 
-      {/* ── Summary Row (always visible) ──────────────────── */}
+      {/* ── Summary Row ──────────────────── */}
       <button
         type="button"
         onClick={() => setExpanded(v => !v)}
@@ -144,9 +132,13 @@ export default function FeeBreakdownPanel({
           <span>{finality}</span>
           <span className="opacity-40">·</span>
           <span>Est. Total Fee: {totalEstFeeDisplay}</span>
-          {speedMode === 'fast' && (
-            <span className="text-[#10B981] bg-[#10B981]/10 px-1.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider">
-              FAST
+          {isForwarding ? (
+            <span className="text-[#10B981] bg-[#10B981]/15 border border-[#10B981]/30 px-1.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider flex items-center gap-0.5">
+              <Zap className="h-2.5 w-2.5" /> 1-STEP AUTO
+            </span>
+          ) : (
+            <span className="text-slate-400 bg-slate-500/10 border border-slate-500/20 px-1.5 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wider flex items-center gap-0.5">
+              <Lock className="h-2.5 w-2.5" /> 2-STEP MINT
             </span>
           )}
         </div>
@@ -169,10 +161,9 @@ export default function FeeBreakdownPanel({
           >
             <div className={`px-3 pb-3 border-t ${dividerColor} pt-2.5 flex flex-col gap-2`}>
 
-              {/* Fee rows */}
               {[
                 { label: 'Source Gas Fee', value: srcGas, icon: '⛽' },
-                { label: 'Destination Gas Fee', value: dstGas, icon: '⛽' },
+                { label: 'Destination Gas Fee', value: dstGas, icon: isForwarding ? '⚡' : '⛽' },
                 { label: 'Circle CCTP Fee (1%)', value: cctpFeeDisplay, icon: '🔵' },
               ].map(row => (
                 <div key={row.label} className={`flex items-center justify-between text-[11px] font-semibold ${textMuted}`}>
@@ -184,33 +175,26 @@ export default function FeeBreakdownPanel({
                 </div>
               ))}
 
-              {/* Divider */}
               <div className={`border-t ${dividerColor} my-0.5`} />
 
-              {/* You receive row */}
-              <div className={`flex items-center justify-between text-[12px] font-black`}>
+              <div className="flex items-center justify-between text-[12px] font-black">
                 <span className={textMuted}>You Receive</span>
                 <span className="text-[#10B981]">{receivedDisplay} USDC</span>
               </div>
 
-
-
-              {/* Fast mode info tip */}
-              {speedMode === 'fast' && (
+              {isForwarding ? (
                 <div className={`rounded-[8px] p-2 text-[10px] font-semibold leading-relaxed flex items-start gap-1.5 ${
-                  isDark ? 'bg-[#10B981]/10 text-[#10B981]' : 'bg-emerald-50 text-emerald-700'
+                  isDark ? 'bg-[#10B981]/15 text-[#10B981] border border-[#10B981]/30' : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
                 }`}>
-                  <Zap className="h-3 w-3 flex-shrink-0 mt-0.5" />
-                  Fast mode uses Circle's high-finality threshold for near-instant attestation. Slightly higher CCTP fee applies.
+                  <Zap className="h-3 w-3 flex-shrink-0 mt-0.5 text-[#10B981]" />
+                  <span><strong>Circle Forwarding Active:</strong> Sign once on source chain — USDC is automatically minted to your destination wallet with zero destination gas required.</span>
                 </div>
-              )}
-
-              {speedMode === 'standard' && (
+              ) : (
                 <div className={`rounded-[8px] p-2 text-[10px] font-semibold leading-relaxed flex items-start gap-1.5 ${
-                  isDark ? 'bg-blue-900/20 text-blue-300' : 'bg-blue-50 text-blue-600'
+                  isDark ? 'bg-amber-950/20 text-amber-300 border border-amber-900/30' : 'bg-amber-50 text-amber-800 border border-amber-200'
                 }`}>
-                  <Clock className="h-3 w-3 flex-shrink-0 mt-0.5" />
-                  Standard mode uses default Circle finality thresholds. Lower fees, longer wait time.
+                  <Lock className="h-3 w-3 flex-shrink-0 mt-0.5 text-amber-500" />
+                  <span><strong>Manual Mint Route:</strong> Requires 2 steps (Burn on source chain, then manual signature to mint on {toChain?.shortName || 'destination'}).</span>
                 </div>
               )}
 

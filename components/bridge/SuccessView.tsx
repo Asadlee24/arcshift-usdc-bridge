@@ -5,7 +5,7 @@
 
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { ExternalLink, Check, ArrowRight, Sparkles, Copy } from 'lucide-react';
+import { ExternalLink, Check, ArrowRight, Sparkles, Copy, Zap } from 'lucide-react';
 import { getChainById } from '../../constants/chains';
 
 interface SuccessViewProps {
@@ -40,6 +40,8 @@ export default function SuccessView({
   const isDark = theme === 'dark';
   const [copied, setCopied] = useState(false);
 
+  const isAutoForwarded = destTxHash === 'auto-relayed' || toChain?.supportsForwarding === true;
+
   const textPrimary = isDark ? 'text-white' : 'text-slate-900';
   const textMuted = isDark ? 'text-slate-400' : 'text-slate-500';
   
@@ -49,13 +51,14 @@ export default function SuccessView({
 
   const formatAddress = (addr: string) => {
     if (!addr) return '';
+    if (addr === 'auto-relayed') return 'Auto-Relayed';
     return addr.substring(0, 6) + '...' + addr.substring(addr.length - 6);
   };
 
   const handleCopy = () => {
     const receiptText = isSwap
       ? `ArcShift Swap Receipt\n---------------------------\nAmount: ${amount}\nCompleted in ${elapsedSeconds} seconds\nTransaction Hash: ${sourceTxHash}\n---------------------------\nSwapped with ArcShift`
-      : `ArcShift Bridge Receipt\n---------------------------\nAmount: ${amount}\nRoute: ${fromChain?.name} → ${toChain?.name}\nCompleted in ${elapsedSeconds} seconds\nSource Tx: ${sourceTxHash}\nDest Tx: ${destTxHash || ''}\n---------------------------\nBridged with ArcShift`;
+      : `ArcShift Bridge Receipt\n---------------------------\nAmount: ${amount}\nRoute: ${fromChain?.name} → ${toChain?.name}\nMode: ${isAutoForwarded ? 'Circle Auto-Relay (1-Step)' : 'Manual Mint (2-Step)'}\nCompleted in ${elapsedSeconds} seconds\nSource Tx: ${sourceTxHash}\n---------------------------\nBridged with ArcShift`;
     navigator.clipboard.writeText(receiptText);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -64,7 +67,7 @@ export default function SuccessView({
   const handleShareX = () => {
     const text = isSwap
       ? `Just swapped ${amount} on Arc Testnet in ${elapsedSeconds} seconds using @ArcShift! 🚀\nTx: ${sourceTxHash}`
-      : `Just bridged ${amount} from ${fromChain?.name} to ${toChain?.name} in ${elapsedSeconds} seconds using @ArcShift! 🚀\nSource: ${sourceTxHash}\nDest: ${destTxHash || ''}`;
+      : `Just bridged ${amount} from ${fromChain?.name} to ${toChain?.name} in ${elapsedSeconds}s using @ArcShift! 🚀\n${isAutoForwarded ? '⚡ Circle 1-Step Auto-Relay' : '🔒 2-Step Mint'}\nSource Tx: ${sourceTxHash}`;
     const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`;
     window.open(url, '_blank');
   };
@@ -84,8 +87,13 @@ export default function SuccessView({
         </div>
         
         <div className="flex-1 min-w-0">
-          <h3 className={`text-base font-black ${textPrimary} tracking-tight uppercase leading-none mb-1`}>
+          <h3 className={`text-base font-black ${textPrimary} tracking-tight uppercase leading-none mb-1 flex items-center gap-1.5`}>
             {isSwap ? 'SWAP COMPLETE' : 'BRIDGE COMPLETE'}
+            {isAutoForwarded && !isSwap && (
+              <span className="text-[9px] font-black text-[#10B981] bg-[#10B981]/15 px-1.5 py-0.5 rounded border border-[#10B981]/30 flex items-center gap-0.5">
+                <Zap className="h-2.5 w-2.5" /> Auto-Relayed
+              </span>
+            )}
           </h3>
           <p className={`text-[11px] font-bold ${textMuted} truncate`}>
             {isSwap ? 'Successfully swapped ' : 'Successfully transferred '}
@@ -96,17 +104,14 @@ export default function SuccessView({
 
       {/* 2. Compact Interactive Path Simulator */}
       <div className="w-full mb-3.5 p-2.5 rounded-xl border flex items-center justify-between relative overflow-hidden bg-slate-500/5 border-slate-500/10">
-        {/* Route Line */}
         <div className="absolute top-1/2 left-[40px] right-[40px] -translate-y-1/2 h-[1px] border-t border-dashed border-slate-400/30 z-0" />
         
-        {/* Animated Flying Token Particle */}
         <motion.div
           animate={{ x: [0, 160, 0] }}
           transition={{ duration: 3.5, repeat: Infinity, ease: 'easeInOut' }}
           className="absolute top-1/2 left-[42px] -translate-y-1/2 h-2 w-2 rounded-full bg-[#10B981] shadow-[0_0_6px_#10B981] z-10"
         />
 
-        {/* Source Chain Node */}
         <div className="flex flex-col items-center gap-1 z-10">
           <div className={`h-8 w-8 rounded-full p-0.5 flex items-center justify-center border shadow-xs ${
             isDark ? 'bg-[#0F172A] border-slate-700/40' : 'bg-white border-slate-200'
@@ -118,7 +123,6 @@ export default function SuccessView({
 
         <ArrowRight className="h-4 w-4 text-[#10B981] animate-pulse flex-shrink-0" />
 
-        {/* Destination Chain Node */}
         <div className="flex flex-col items-center gap-1 z-10">
           <div className={`h-8 w-8 rounded-full p-0.5 flex items-center justify-center border-2 shadow-xs ${
             isDark ? 'bg-[#0F172A] border-[#10B981]' : 'bg-white border-[#10B981]'
@@ -129,14 +133,13 @@ export default function SuccessView({
         </div>
       </div>
 
-      {/* 3. Compact Bridge/Swap Receipt (Terminal-style) */}
+      {/* 3. Terminal-style Bridge Receipt */}
       <div className="w-full mb-3.5 relative">
         <div className={`p-4 rounded-xl border border-dashed relative overflow-hidden font-mono text-left ${
           isDark 
             ? 'bg-[#0F172A]/70 border-slate-800 text-slate-300' 
             : 'bg-white border-slate-300 text-slate-700 shadow-sm'
         }`}>
-          {/* Top Receipt Tear Details */}
           <div className="absolute top-0 left-0 right-0 h-1 flex justify-between overflow-hidden">
             {Array.from({ length: 28 }).map((_, i) => (
               <div 
@@ -170,6 +173,13 @@ export default function SuccessView({
             </div>
 
             <div className="flex justify-between">
+              <span className="opacity-60">Mode:</span>
+              <span className="font-bold text-[#10B981]">
+                {isAutoForwarded ? 'Circle 1-Step Auto-Relay' : '2-Step Manual Mint'}
+              </span>
+            </div>
+
+            <div className="flex justify-between">
               <span className="opacity-60">Completed in:</span>
               <span className="font-bold">{elapsedSeconds}s</span>
             </div>
@@ -187,24 +197,29 @@ export default function SuccessView({
               </a>
             </div>
 
-            {!isSwap && destTxHash && (
+            {!isSwap && (
               <div className="flex justify-between items-center">
-                <span className="opacity-60">Dest Tx:</span>
-                <a
-                  href={toChain?.explorerUrl ? `${toChain.explorerUrl}/tx/${destTxHash}` : '#'}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-bold font-mono text-[#10B981] hover:underline flex items-center gap-0.5"
-                >
-                  {formatAddress(destTxHash)}
-                  <ExternalLink className="h-2.5 w-2.5" />
-                </a>
+                <span className="opacity-60">Destination Status:</span>
+                {destTxHash && destTxHash !== 'auto-relayed' ? (
+                  <a
+                    href={toChain?.explorerUrl ? `${toChain.explorerUrl}/tx/${destTxHash}` : '#'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-bold font-mono text-[#10B981] hover:underline flex items-center gap-0.5"
+                  >
+                    {formatAddress(destTxHash)}
+                    <ExternalLink className="h-2.5 w-2.5" />
+                  </a>
+                ) : (
+                  <span className="font-bold font-mono text-[#10B981] flex items-center gap-1">
+                    <Zap className="h-3 w-3" /> Auto-Minted
+                  </span>
+                )}
               </div>
             )}
 
           </div>
 
-          {/* Bottom Receipt Tear Details */}
           <div className="absolute bottom-0 left-0 right-0 h-1 flex justify-between overflow-hidden">
             {Array.from({ length: 28 }).map((_, i) => (
               <div 
@@ -253,7 +268,7 @@ export default function SuccessView({
         </button>
 
         <a
-          href={toChain?.explorerUrl ? `${toChain.explorerUrl}/tx/${sourceTxHash}` : '#'}
+          href={fromChain?.explorerUrl ? `${fromChain.explorerUrl}/tx/${sourceTxHash}` : '#'}
           target="_blank"
           rel="noopener noreferrer"
           className={`flex-1 py-2 rounded-lg border text-[9px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
