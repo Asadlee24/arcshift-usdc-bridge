@@ -4,9 +4,9 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { getChainById } from '../constants/chains';
-import { writeContract, waitForTransactionReceipt, getAccount, switchChain, getGasPrice } from '@wagmi/core';
+import { writeContract, waitForTransactionReceipt, getAccount, switchChain, getGasPrice, readContract } from '@wagmi/core';
 import { config } from '../lib/wagmi';
-import { parseUnits, pad, readContract } from 'viem';
+import { parseUnits, pad } from 'viem';
 import { addTransaction, updateTransaction } from './useTransactionHistory';
 
 // Solana & Circle AppKit Imports
