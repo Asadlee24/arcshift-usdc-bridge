@@ -1,5 +1,10 @@
+// components/bridge/StepTracker.tsx
+// Animated step tracker for bridge transactions with metallic gold branding
+
+'use client';
+
 import React from 'react';
-import { Check, X, Loader2, ExternalLink, Activity, Zap, Lock } from 'lucide-react';
+import { Check, X, Loader2, ExternalLink, Activity, Zap } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { BridgeStep } from '../../hooks/useBridge';
 
@@ -32,12 +37,10 @@ export default function StepTracker({
 
   const textPrimary = isDark ? 'text-white' : 'text-slate-900';
   const textMuted = isDark ? 'text-slate-400' : 'text-slate-500';
-  const dividerBorder = isDark ? 'border-[#1E293B]' : 'border-slate-200';
-  const bgCircleBase = isDark ? 'bg-[#0F172A]' : 'bg-white';
+  const dividerBorder = isDark ? 'border-slate-800' : 'border-slate-200';
+  const bgCircleBase = isDark ? 'bg-slate-900' : 'bg-white';
   const borderLineBase = isDark ? 'bg-slate-800' : 'bg-slate-200';
-  const linkBg = isDark ? 'bg-[#131B2E] border-[#1E293B] text-slate-400 hover:text-white hover:border-[#10B981]' : 'bg-slate-50 border-slate-200 text-slate-600 hover:text-slate-900 hover:border-[#10B981]';
-
-  const isForwardingRoute = steps.length === 3;
+  const linkBg = isDark ? 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white hover:border-amber-500/50' : 'bg-slate-50 border-slate-200 text-slate-600 hover:text-slate-900 hover:border-amber-500';
 
   const getEstDuration = (chainName: string): { duration: number; speed: string } => {
     const name = chainName.toLowerCase();
@@ -63,54 +66,46 @@ export default function StepTracker({
       <div className={`flex items-center justify-between pb-4 mb-4 border-b ${dividerBorder}`}>
         <div>
           <div className="flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-full bg-[#10B981] animate-ping" />
+            <span className="h-2 w-2 rounded-full bg-amber-500 animate-ping" />
             <h3 className={`text-sm font-black tracking-wide ${textPrimary} uppercase`}>
               {isSwap ? 'Swapping Assets' : 'Bridging Assets'}
             </h3>
-            {isForwardingRoute ? (
-              <span className="text-[9px] font-black text-[#10B981] bg-[#10B981]/15 px-2 py-0.5 rounded-full border border-[#10B981]/30 flex items-center gap-0.5 ml-2">
-                <Zap className="h-2.5 w-2.5" /> Circle Auto-Relay
-              </span>
-            ) : (
-              <span className="text-[9px] font-semibold text-slate-400 bg-slate-500/10 px-2 py-0.5 rounded-full border border-slate-500/20 flex items-center gap-0.5 ml-2">
-                <Lock className="h-2.5 w-2.5" /> 2-Step Mint
-              </span>
-            )}
+            <span className="text-[9px] font-bold text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20 flex items-center gap-1 ml-2">
+              <Zap className="h-2.5 w-2.5" /> Circle Auto-Relay
+            </span>
           </div>
           <p className={`text-[11px] font-semibold ${textMuted} mt-0.5`}>
             {isSwap ? (
               <>
-                Swapping <span className="text-[#10B981] font-black">{amount} {swapTokens?.sell || 'USDC'}</span> to <span className="text-blue-400 font-black">{swapTokens?.buy || 'EURC'}</span> on <span className="text-[#10B981] font-black">Arc Testnet</span>
+                Swapping <span className="text-amber-500 font-bold">{amount} {swapTokens?.sell || 'USDC'}</span> to <span className="text-amber-400 font-bold">{swapTokens?.buy || 'EURC'}</span> on <span className="text-amber-500 font-bold">Arc Testnet</span>
               </>
             ) : (
               <>
-                {amount} USDC from <span className="text-[#10B981] font-black">{sourceChainName.replace(/_/g, ' ')}</span> to <span className="text-blue-400 font-black">{destChainName.replace(/_/g, ' ')}</span>
+                {amount} USDC from <span className="text-amber-500 font-bold">{sourceChainName.replace(/_/g, ' ')}</span> to <span className="text-amber-400 font-bold">{destChainName.replace(/_/g, ' ')}</span>
               </>
             )}
           </p>
         </div>
-        <div className={`text-xs font-black ${isDark ? 'text-slate-300' : 'text-slate-600'} font-mono bg-slate-500/10 px-2 py-0.5 rounded-[4px] border border-slate-500/15 tabular-nums`}>
+        <div className={`text-xs font-bold ${isDark ? 'text-slate-300' : 'text-slate-600'} font-mono bg-slate-500/10 px-2.5 py-1 rounded-md border border-slate-500/15 tabular-nums`}>
           {elapsedSeconds}s
         </div>
       </div>
 
       {/* Progress Banner */}
-      <div className={`mb-5 p-4 rounded-2xl border relative overflow-hidden ${isDark ? 'bg-[#0B1221] border-[#1E293B] shadow-[0_0_20px_rgba(16,185,129,0.02)]' : 'bg-slate-50 border-slate-200'}`}>
-        <div className="absolute top-0 bottom-0 left-0 w-[80px] bg-gradient-to-r from-transparent via-[#10B981]/15 to-transparent pointer-events-none animate-scanline" />
-
+      <div className={`mb-5 p-4 rounded-xl border relative overflow-hidden ${isDark ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
         <div className="flex items-center justify-between mb-2">
-          <span className={`text-[11px] font-extrabold uppercase tracking-wider ${textMuted} flex items-center gap-1`}>
-            <Activity className="h-3 w-3 text-[#10B981] animate-pulse" />
+          <span className={`text-[11px] font-extrabold uppercase tracking-wider ${textMuted} flex items-center gap-1.5`}>
+            <Activity className="h-3 w-3 text-amber-500 animate-pulse" />
             Estimated Finality
           </span>
-          <span className="text-[13px] font-black text-[#10B981] font-mono tabular-nums">
+          <span className="text-[13px] font-bold text-amber-500 font-mono tabular-nums">
             {remainingTime > 0 ? `${remainingTime}s` : 'Finalizing...'}
           </span>
         </div>
         
         <div className={`w-full h-2 rounded-full overflow-hidden relative ${isDark ? 'bg-slate-800' : 'bg-slate-200'}`}>
           <motion.div 
-            className="h-full bg-gradient-to-r from-blue-500 via-emerald-400 to-[#10B981] rounded-full shadow-[0_0_8px_rgba(16,185,129,0.5)]"
+            className="h-full bg-gradient-to-r from-[#C8922A] via-[#D4A043] to-[#E8A830] rounded-full shadow-sm"
             initial={{ width: 0 }}
             animate={{ width: `${progressPercent}%` }}
             transition={{ duration: 0.5, ease: 'easeOut' }}
@@ -119,23 +114,20 @@ export default function StepTracker({
         
         <div className="flex justify-between items-center mt-2 text-[10px] font-semibold">
           <span className={textMuted}>Speed Profile: {speedLabel}</span>
-          <span className="text-[#10B981] font-black font-mono">{Math.round(progressPercent)}%</span>
+          <span className="text-amber-500 font-bold font-mono">{Math.round(progressPercent)}%</span>
         </div>
       </div>
 
       {/* Animated Step Nodes */}
       <div className="flex flex-col">
         {steps.map((step, idx) => {
-          const isPending = step.status === 'pending';
           const isActive = step.status === 'active';
           const isDone = step.status === 'done';
           const isErr = step.status === 'error';
 
           let subText = step.description;
           if (isActive && step.name === 'attest') {
-            subText = isForwardingRoute
-              ? `Circle is attesting burn & auto-minting on destination... ${attestationElapsed}s`
-              : `Verifying signatures from Circle Attestation network... ${attestationElapsed}s`;
+            subText = `Circle consensus attesting burn & auto-minting on destination... ${attestationElapsed}s`;
           }
 
           return (
@@ -144,7 +136,7 @@ export default function StepTracker({
               <div className="flex flex-col items-center relative flex-shrink-0">
                 <div className="relative h-[30px] w-[30px] flex items-center justify-center">
                   {isActive && (
-                    <span className="absolute inset-0 rounded-full bg-[#10B981]/20 border border-[#10B981]/60 animate-ping" />
+                    <span className="absolute inset-0 rounded-full bg-amber-500/20 border border-amber-500/60 animate-ping" />
                   )}
 
                   <motion.div
@@ -153,18 +145,18 @@ export default function StepTracker({
                     transition={{ duration: 0.35, ease: 'easeInOut' }}
                     className={`flex h-[26px] w-[26px] z-10 items-center justify-center rounded-full border transition-all duration-300 ${
                       isDone
-                        ? 'bg-[#10B981] border-[#10B981] text-[#070B13] shadow-[0_0_12px_rgba(16,185,129,0.4)]'
+                        ? 'bg-amber-500 border-amber-500 text-slate-950 font-bold'
                         : isActive
-                        ? `border-2 border-[#10B981] ${bgCircleBase} text-[#10B981] shadow-[0_0_10px_rgba(16,185,129,0.25)]`
+                        ? `border-2 border-amber-500 ${bgCircleBase} text-amber-500`
                         : isErr
-                        ? 'bg-red-500 border-red-500 text-white shadow-[0_0_10px_rgba(239,68,68,0.4)]'
+                        ? 'bg-red-500 border-red-500 text-white'
                         : `border-2 ${isDark ? 'border-slate-800' : 'border-slate-200'} ${bgCircleBase} ${isDark ? 'text-slate-700' : 'text-slate-300'}`
                     }`}
                   >
                     {isDone ? (
-                      <Check className="h-3.5 w-3.5 text-[#070B13] stroke-[3]" />
+                      <Check className="h-3.5 w-3.5 stroke-[3]" />
                     ) : isActive ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin text-[#10B981]" />
+                      <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-500" />
                     ) : isErr ? (
                       <X className="h-3.5 w-3.5 text-white" />
                     ) : (
@@ -174,13 +166,13 @@ export default function StepTracker({
                 </div>
 
                 {idx < steps.length - 1 && (
-                  <div className={`absolute top-[30px] bottom-0 w-[2.5px] rounded-full ${borderLineBase}`}>
+                  <div className={`absolute top-[30px] bottom-0 w-[2px] rounded-full ${borderLineBase}`}>
                     {(isDone || (isActive && idx === 0)) && (
                       <motion.div
                         initial={{ height: '0%' }}
                         animate={{ height: isDone ? '100%' : '50%' }}
                         transition={{ duration: 0.4 }}
-                        className="w-full bg-[#10B981] rounded-full shadow-[0_0_6px_rgba(16,185,129,0.3)]"
+                        className="w-full bg-amber-500 rounded-full"
                       />
                     )}
                   </div>
@@ -193,10 +185,10 @@ export default function StepTracker({
                 transition={{ duration: 0.35, delay: idx * 0.1 }}
                 className="flex-1 pb-6 last:pb-0 flex flex-col items-start"
               >
-                <span className={`text-[13px] font-black tracking-wide ${isActive ? 'text-[#10B981]' : textPrimary}`}>
+                <span className={`text-[13px] font-bold tracking-wide ${isActive ? 'text-amber-500' : textPrimary}`}>
                   {step.label}
                 </span>
-                <span className={`text-[11px] ${textMuted} font-semibold mt-0.5 leading-relaxed`}>
+                <span className={`text-[11px] ${textMuted} font-medium mt-0.5 leading-relaxed`}>
                   {subText}
                 </span>
 
@@ -207,10 +199,10 @@ export default function StepTracker({
                     href={step.explorerUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className={`inline-flex items-center gap-1.5 font-mono text-[9.5px] border px-2.5 py-0.5 rounded-lg transition-all duration-200 mt-2.5 cursor-pointer hover:shadow-sm ${linkBg}`}
+                    className={`inline-flex items-center gap-1.5 font-mono text-[10px] border px-2.5 py-1 rounded-md transition-all duration-200 mt-2.5 cursor-pointer hover:shadow-sm ${linkBg}`}
                   >
                     <span>{step.txHash}</span>
-                    <ExternalLink className="h-3 w-3 text-[#10B981]" />
+                    <ExternalLink className="h-3 w-3 text-amber-500" />
                   </motion.a>
                 )}
               </motion.div>
@@ -223,14 +215,14 @@ export default function StepTracker({
         <motion.div 
           initial={{ x: [-10, 10, -10, 10, 0] }}
           transition={{ duration: 0.4 }}
-          className={`mt-5 rounded-2xl ${isDark ? 'bg-red-950/20 border-red-900/30' : 'bg-red-50 border-red-200'} border p-4 flex gap-3 items-start text-xs`}
+          className={`mt-5 rounded-xl ${isDark ? 'bg-red-950/20 border-red-900/30' : 'bg-red-50 border-red-200'} border p-4 flex gap-3 items-start text-xs`}
         >
-          <div className="h-6 w-6 rounded-full bg-red-600 flex items-center justify-center flex-shrink-0 text-white mt-0.5 font-bold">
+          <div className="h-5 w-5 rounded-full bg-red-600 flex items-center justify-center flex-shrink-0 text-white font-bold text-[10px] mt-0.5">
             !
           </div>
           <div className="flex flex-col">
-            <span className={`font-black ${isDark ? 'text-red-400' : 'text-red-600'} uppercase tracking-wide`}>Transaction Error</span>
-            <span className={`${isDark ? 'text-slate-400' : 'text-slate-500'} mt-0.5 leading-relaxed font-semibold`}>{error}</span>
+            <span className={`font-bold ${isDark ? 'text-red-400' : 'text-red-600'} uppercase tracking-wide`}>Transaction Error</span>
+            <span className={`${isDark ? 'text-slate-400' : 'text-slate-500'} mt-0.5 leading-relaxed font-medium`}>{error}</span>
           </div>
         </motion.div>
       )}

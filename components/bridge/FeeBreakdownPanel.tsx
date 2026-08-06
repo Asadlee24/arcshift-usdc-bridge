@@ -5,7 +5,7 @@
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, ChevronUp, Zap, Clock, Lock } from 'lucide-react';
+import { ChevronDown, ChevronUp, Zap, Clock, ShieldCheck } from 'lucide-react';
 import { getChainById } from '../../constants/chains';
 
 export type SpeedMode = 'fast' | 'standard';
@@ -88,15 +88,15 @@ export default function FeeBreakdownPanel({
   const isDark = theme === 'dark';
 
   const toChain = getChainById(toChainId);
-  const isForwarding = toChain?.supportsForwarding === true;
+  const isForwarding = toChain?.supportsForwarding !== false;
 
   const hasAmount = parseFloat(amount || '0') > 0;
 
-  const borderColor = isDark ? 'border-[#1E293B]' : 'border-slate-200';
-  const bgColor = isDark ? 'bg-[#0B1221]' : 'bg-slate-50';
+  const borderColor = isDark ? 'border-slate-800' : 'border-slate-200';
+  const bgColor = isDark ? 'bg-slate-900/60' : 'bg-slate-50';
   const textMuted = isDark ? 'text-slate-400' : 'text-slate-500';
   const textPrimary = isDark ? 'text-white' : 'text-slate-900';
-  const dividerColor = isDark ? 'border-[#1E293B]' : 'border-slate-200';
+  const dividerColor = isDark ? 'border-slate-800' : 'border-slate-200';
 
   const srcGas = GAS_FEE_ESTIMATES[fromChainId] ?? '~$0.05';
   const dstGas = isForwarding ? '$0.00 (Forwarded)' : (DEST_GAS_ESTIMATES[toChainId] ?? '~$0.01');
@@ -119,7 +119,7 @@ export default function FeeBreakdownPanel({
   const finality = FINALITY_TIME[speedMode][fromChainId] ?? (speedMode === 'fast' ? '~30 sec' : '~5 min');
 
   return (
-    <div className={`rounded-[14px] border ${borderColor} ${bgColor} overflow-hidden mb-3 transition-all duration-200`}>
+    <div className={`rounded-xl border ${borderColor} ${bgColor} overflow-hidden mb-3 transition-all duration-200`}>
 
       {/* ── Summary Row ──────────────────── */}
       <button
@@ -128,19 +128,13 @@ export default function FeeBreakdownPanel({
         className={`w-full flex items-center justify-between px-3 py-2.5 ${textMuted} hover:${textPrimary} transition-colors`}
       >
         <div className="flex items-center gap-2 text-[11px] font-semibold">
-          <Clock className="h-3 w-3 text-[#10B981]" />
+          <Clock className="h-3 w-3 text-amber-500" />
           <span>{finality}</span>
           <span className="opacity-40">·</span>
           <span>Est. Total Fee: {totalEstFeeDisplay}</span>
-          {isForwarding ? (
-            <span className="text-[#10B981] bg-[#10B981]/15 border border-[#10B981]/30 px-1.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider flex items-center gap-0.5">
-              <Zap className="h-2.5 w-2.5" /> 1-STEP AUTO
-            </span>
-          ) : (
-            <span className="text-slate-400 bg-slate-500/10 border border-slate-500/20 px-1.5 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wider flex items-center gap-0.5">
-              <Lock className="h-2.5 w-2.5" /> 2-STEP MINT
-            </span>
-          )}
+          <span className="text-amber-500 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider flex items-center gap-1">
+            <Zap className="h-2.5 w-2.5" /> 1-Signature Auto-Relay
+          </span>
         </div>
         {expanded
           ? <ChevronUp className="h-3.5 w-3.5 flex-shrink-0" />
@@ -162,15 +156,12 @@ export default function FeeBreakdownPanel({
             <div className={`px-3 pb-3 border-t ${dividerColor} pt-2.5 flex flex-col gap-2`}>
 
               {[
-                { label: 'Source Gas Fee', value: srcGas, icon: '⛽' },
-                { label: 'Destination Gas Fee', value: dstGas, icon: isForwarding ? '⚡' : '⛽' },
-                { label: 'Circle CCTP Fee (1%)', value: cctpFeeDisplay, icon: '🔵' },
+                { label: 'Source Gas Fee', value: srcGas },
+                { label: 'Destination Gas Fee', value: dstGas },
+                { label: 'Circle CCTP Protocol Fee (1%)', value: cctpFeeDisplay },
               ].map(row => (
                 <div key={row.label} className={`flex items-center justify-between text-[11px] font-semibold ${textMuted}`}>
-                  <span className="flex items-center gap-1.5">
-                    <span className="text-[10px]">{row.icon}</span>
-                    {row.label}
-                  </span>
+                  <span>{row.label}</span>
                   <span className={textPrimary}>{row.value}</span>
                 </div>
               ))}
@@ -179,24 +170,15 @@ export default function FeeBreakdownPanel({
 
               <div className="flex items-center justify-between text-[12px] font-black">
                 <span className={textMuted}>You Receive</span>
-                <span className="text-[#10B981]">{receivedDisplay} USDC</span>
+                <span className="text-[#C8922A]">{receivedDisplay} USDC</span>
               </div>
 
-              {isForwarding ? (
-                <div className={`rounded-[8px] p-2 text-[10px] font-semibold leading-relaxed flex items-start gap-1.5 ${
-                  isDark ? 'bg-[#10B981]/15 text-[#10B981] border border-[#10B981]/30' : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                }`}>
-                  <Zap className="h-3 w-3 flex-shrink-0 mt-0.5 text-[#10B981]" />
-                  <span><strong>Circle Forwarding Active:</strong> Sign once on source chain — USDC is automatically minted to your destination wallet with zero destination gas required.</span>
-                </div>
-              ) : (
-                <div className={`rounded-[8px] p-2 text-[10px] font-semibold leading-relaxed flex items-start gap-1.5 ${
-                  isDark ? 'bg-amber-950/20 text-amber-300 border border-amber-900/30' : 'bg-amber-50 text-amber-800 border border-amber-200'
-                }`}>
-                  <Lock className="h-3 w-3 flex-shrink-0 mt-0.5 text-amber-500" />
-                  <span><strong>Manual Mint Route:</strong> Requires 2 steps (Burn on source chain, then manual signature to mint on {toChain?.shortName || 'destination'}).</span>
-                </div>
-              )}
+              <div className={`rounded-lg p-2.5 text-[10px] font-medium leading-relaxed flex items-start gap-2 ${
+                isDark ? 'bg-amber-500/10 text-amber-300/90 border border-amber-500/20' : 'bg-amber-50 text-amber-900 border border-amber-200'
+              }`}>
+                <ShieldCheck className="h-3.5 w-3.5 flex-shrink-0 mt-0.5 text-amber-500" />
+                <span><strong>Circle CCTP v2 Auto-Relay:</strong> Single-signature burn on source chain — native USDC is automatically minted directly to your destination wallet.</span>
+              </div>
 
             </div>
           </motion.div>
