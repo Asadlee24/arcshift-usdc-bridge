@@ -1,7 +1,10 @@
+// components/bridge/BridgeButton.tsx
+// Ultra-sleek unified bridge CTA button
+
 import React from 'react';
 import { useAccount, useSwitchChain } from 'wagmi';
 import { useConnectModal } from '@rainbow-me/rainbowkit';
-import { Loader2, ArrowRight, Wallet, ShieldAlert, Check, RotateCw } from 'lucide-react';
+import { Loader2, ArrowRight, Wallet, ShieldAlert, Check, RotateCw, Zap } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { getChainById } from '../../constants/chains';
 import { useWallet } from '@solana/wallet-adapter-react';
@@ -35,15 +38,14 @@ export default function BridgeButton({
   const fromChain = getChainById(fromChainId);
   const toChain = getChainById(toChainId);
 
-  // Determine if this is a Solana-involved route
   const isSolanaFrom = fromChain?.isSolana || false;
   const isSolanaTo = toChain?.isSolana || false;
   const isSolanaRoute = isSolanaFrom || isSolanaTo;
 
   const isWrongChain = !isSolanaFrom && isConnected && chainId !== fromChainId;
 
-  const heightClass = "h-[50px]";
-  const roundedClass = "rounded-[12px]";
+  const heightClass = "h-13 sm:h-14";
+  const roundedClass = "rounded-2xl";
   const textClass = "text-sm font-black tracking-wider uppercase";
 
   // 1a. SOLANA SOURCE — wallet not connected
@@ -61,9 +63,9 @@ export default function BridgeButton({
             console.log('Solana wallet connect trigger:', e);
           }
         }}
-        whileHover={{ scale: 1.02 }}
+        whileHover={{ scale: 1.01 }}
         whileTap={{ scale: 0.98 }}
-        className={`w-full ${heightClass} ${roundedClass} ${textClass} bg-[#9945FF] hover:bg-[#7C3FD8] text-white flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-[#9945FF]/20`}
+        className={`w-full ${heightClass} ${roundedClass} ${textClass} bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-purple-900/30 transition-all`}
       >
         <Wallet className="h-4 w-4" />
         <span>CONNECT PHANTOM WALLET</span>
@@ -77,9 +79,9 @@ export default function BridgeButton({
       <motion.button
         type="button"
         onClick={openConnectModal}
-        whileHover={{ scale: 1.02 }}
+        whileHover={{ scale: 1.01 }}
         whileTap={{ scale: 0.98 }}
-        className={`w-full ${heightClass} ${roundedClass} ${textClass} bg-[#10B981] hover:bg-[#059669] text-[#070B13] flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-[#10B981]/5`}
+        className={`w-full ${heightClass} ${roundedClass} ${textClass} bg-gradient-to-r from-[#C8922A] via-[#D4A043] to-[#E8A830] hover:brightness-110 text-white flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-[#C8922A]/25 transition-all`}
       >
         <Wallet className="h-4 w-4" />
         <span>CONNECT EVM WALLET</span>
@@ -102,9 +104,9 @@ export default function BridgeButton({
             console.log('Solana receiver wallet connect trigger:', e);
           }
         }}
-        whileHover={{ scale: 1.02 }}
+        whileHover={{ scale: 1.01 }}
         whileTap={{ scale: 0.98 }}
-        className={`w-full ${heightClass} ${roundedClass} ${textClass} bg-[#9945FF] hover:bg-[#7C3FD8] text-white flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-[#9945FF]/20`}
+        className={`w-full ${heightClass} ${roundedClass} ${textClass} bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-purple-900/30 transition-all`}
       >
         <Wallet className="h-4 w-4" />
         <span>CONNECT SOLANA RECEIVER</span>
@@ -118,9 +120,9 @@ export default function BridgeButton({
       <motion.button
         type="button"
         onClick={openConnectModal}
-        whileHover={{ scale: 1.02 }}
+        whileHover={{ scale: 1.01 }}
         whileTap={{ scale: 0.98 }}
-        className={`w-full ${heightClass} ${roundedClass} ${textClass} bg-[#10B981] hover:bg-[#059669] text-[#070B13] flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-[#10B981]/5`}
+        className={`w-full ${heightClass} ${roundedClass} ${textClass} bg-gradient-to-r from-[#C8922A] via-[#D4A043] to-[#E8A830] hover:brightness-110 text-white flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-[#C8922A]/25 transition-all`}
       >
         <Wallet className="h-4 w-4" />
         <span>CONNECT WALLET</span>
@@ -134,9 +136,9 @@ export default function BridgeButton({
       <motion.button
         type="button"
         onClick={() => switchChain({ chainId: fromChainId })}
-        whileHover={{ scale: 1.02 }}
+        whileHover={{ scale: 1.01 }}
         whileTap={{ scale: 0.98 }}
-        className={`w-full ${heightClass} ${roundedClass} ${textClass} bg-amber-500 hover:bg-amber-600 text-white flex items-center justify-center gap-2 cursor-pointer`}
+        className={`w-full ${heightClass} ${roundedClass} ${textClass} bg-amber-500 hover:bg-amber-600 text-white flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-amber-500/20 transition-all`}
       >
         <ShieldAlert className="h-4 w-4 animate-bounce" />
         <span>Switch Network to {fromChain.shortName}</span>
@@ -148,7 +150,6 @@ export default function BridgeButton({
   const isSuccess = status === 'success';
   const isError = status === 'error';
 
-  // Disable button if amount is invalid, or already bridging, or explicitly disabled
   const isBtnDisabled = disabled || isBridging || !isValidAmount || parseFloat(amount) <= 0;
 
   if (isSuccess) {
@@ -157,7 +158,7 @@ export default function BridgeButton({
         type="button"
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        className={`w-full ${heightClass} ${roundedClass} ${textClass} bg-emerald-500 text-white flex items-center justify-center gap-2 cursor-default`}
+        className={`w-full ${heightClass} ${roundedClass} ${textClass} bg-emerald-500 text-white flex items-center justify-center gap-2 cursor-default shadow-lg shadow-emerald-500/20`}
       >
         <Check className="h-4 w-4 text-white" />
         <span>Bridge Complete</span>
@@ -170,9 +171,9 @@ export default function BridgeButton({
       <motion.button
         type="button"
         onClick={onBridge}
-        whileHover={{ scale: 1.02 }}
+        whileHover={{ scale: 1.01 }}
         whileTap={{ scale: 0.98 }}
-        className={`w-full ${heightClass} ${roundedClass} ${textClass} bg-red-600 hover:bg-red-700 text-white flex items-center justify-center gap-2 cursor-pointer`}
+        className={`w-full ${heightClass} ${roundedClass} ${textClass} bg-red-600 hover:bg-red-700 text-white flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-red-600/20 transition-all`}
       >
         <RotateCw className="h-4 w-4" />
         <span>Try Again</span>
@@ -185,15 +186,16 @@ export default function BridgeButton({
       type="button"
       disabled={isBtnDisabled}
       onClick={onBridge}
-      whileHover={isBtnDisabled ? {} : { scale: 1.02 }}
+      whileHover={isBtnDisabled ? {} : { scale: 1.01 }}
       whileTap={isBtnDisabled ? {} : { scale: 0.98 }}
-      className={`w-full ${heightClass} ${roundedClass} ${textClass} flex items-center justify-center gap-2 ${
+      className={`w-full ${heightClass} ${roundedClass} ${textClass} flex items-center justify-center gap-2 transition-all duration-200 ${
         isBtnDisabled
-          ? "bg-[#1E293B] text-slate-500 border border-[#334155]/20 cursor-not-allowed"
-          : `bg-[#10B981] hover:bg-[#059669] text-[#070B13] cursor-pointer shadow-md shadow-[#10B981]/5`
+          ? "bg-slate-800/50 text-slate-500 border border-slate-800 cursor-not-allowed"
+          : `bg-gradient-to-r from-[#C8922A] via-[#D4A043] to-[#E8A830] hover:brightness-110 text-white cursor-pointer shadow-xl shadow-[#C8922A]/25`
       }`}
       style={{ outline: 'none' }}
     >
+      <Zap className="h-4 w-4" />
       <span>Bridge to {toChain?.shortName || 'Destination'}</span>
       {isBridging ? (
         <Loader2 className="h-4 w-4 animate-spin" />

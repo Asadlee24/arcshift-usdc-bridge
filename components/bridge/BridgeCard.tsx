@@ -1,11 +1,11 @@
 // components/bridge/BridgeCard.tsx
-// Main bridge widget card (supports dark/light theme) — stable USDC-only version.
+// Ultra-sleek Bridge Card component — stable USDC CCTP v2 auto-relay & token swap
 
 'use client';
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Shield, Sparkles, TrendingUp, Info, Clock, Zap, ChevronDown, ArrowDown } from 'lucide-react';
+import { Shield, Sparkles, TrendingUp, Info, Clock, Zap, ChevronDown, ArrowDown, ArrowRightLeft } from 'lucide-react';
 
 import ChainPicker from './ChainPicker';
 import SwapChainsBtn from './SwapChainsBtn';
@@ -29,7 +29,6 @@ import { config } from '../../lib/wagmi';
 import { parseUnits } from 'viem';
 import { readErc20Balance } from '../../lib/rpcClient';
 
-// Arc Testnet. The swap panel is Arc-only, so every balance read here targets this chain.
 const ARC_CHAIN_ID = 5042002;
 
 interface BridgeCardProps {
@@ -40,22 +39,15 @@ export default function BridgeCard({ theme = 'light' }: BridgeCardProps) {
   const { isConnected, address } = useAccount();
   const solanaWallet = useWallet();
 
-  // Core State (Arc is default TO chain, Chain ID 5042002).
-  // Base Sepolia is the default source. Ethereum Sepolia is now enabled and selectable, so
-  // either would work; Base Sepolia is kept as the default because its faucet is the easiest
-  // for testers to top up from.
   const [fromChain, setFromChain] = useState(() => getChainById(84532)!); // Base Sepolia
   const [toChain, setToChain] = useState(() => getChainById(5042002)!); // Arc Testnet
 
-  // Amount inputs
   const [amount, setAmount] = useState('');
   const [amountError, setAmountError] = useState(false);
   const [amountErrorMsg, setAmountErrorMsg] = useState('');
 
-  // Speed mode
   const [speedMode, setSpeedMode] = useState<SpeedMode>('fast');
 
-  // Tabs selector ('bridge' / 'swap')
   const [activeTab, setActiveTab] = useState<'bridge' | 'swap'>('bridge');
   const [showOnRamp, setShowOnRamp] = useState(false);
 
@@ -90,7 +82,6 @@ export default function BridgeCard({ theme = 'light' }: BridgeCardProps) {
   const [buyTokenBalance, setBuyTokenBalance] = useState('0.00');
   const [isLoadingBalances, setIsLoadingBalances] = useState(false);
 
-  // Swap operations states
   const [isSwapping, setIsSwapping] = useState(false);
   const [swapSuccess, setSwapSuccess] = useState(false);
   const [swapTxHash, setSwapTxHash] = useState('');
@@ -113,29 +104,17 @@ export default function BridgeCard({ theme = 'light' }: BridgeCardProps) {
     return 1;
   };
 
-  // Reads a token balance on Arc via the shared RPC client.
-  //
-  // This is the call that produced the reported "Read contract failed: HTTP request failed /
-  // Details: Failed to fetch" for balanceOf on 0x36000...0000: it fetched
-  // https://rpc.testnet.arc.network straight from the browser, and that endpoint sends no
-  // Access-Control-Allow-Origin header, so the request never left the page. readErc20Balance
-  // routes Arc through /api/rpc/5042002 instead, where no CORS policy applies.
   async function queryTokenBalance(tokenAddress: string, userAddress: string, decimals: number): Promise<string> {
     if (!userAddress) return '0.00';
-
     const balance = await readErc20Balance(ARC_CHAIN_ID, tokenAddress, userAddress, decimals);
     if (balance === null) return '0.00';
-
     return balance.toFixed(decimals === 6 ? 2 : 4);
   }
 
-  // Load balances of swap tokens in background
   const triggerBalanceFetch = async () => {
     if (!address) return;
     setIsLoadingBalances(true);
     try {
-      // Both sides are fetched concurrently. Awaiting them in sequence doubled the time the
-      // swap panel sat on "loading" for no reason — the two reads are independent.
       const [sellBal, buyBal] = await Promise.all([
         queryTokenBalance(sellToken.address, address, sellToken.decimals),
         queryTokenBalance(buyToken.address, address, buyToken.decimals),
@@ -169,7 +148,6 @@ export default function BridgeCard({ theme = 'light' }: BridgeCardProps) {
     };
   }, [address, sellToken.address, buyToken.address, activeTab]);
 
-  // Close token picker on outside click
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       const sellContainer = document.getElementById('sell-token-picker-container');
@@ -198,13 +176,11 @@ export default function BridgeCard({ theme = 'light' }: BridgeCardProps) {
       { name: 'mint', status: 'pending', label: 'Finalize Balances', description: 'Updating balances and ledger' }
     ]);
 
-    // Timer elapsed seconds tracking
     const elapsedInterval = setInterval(() => {
       setSwapElapsedSeconds(prev => prev + 1);
     }, 1000);
 
     try {
-      // 1. Ensure user is connected to Arc Testnet
       const account = getAccount(config);
       if (account.chainId !== 5042002) {
         await switchChain(config, { chainId: 5042002 });
@@ -214,11 +190,8 @@ export default function BridgeCard({ theme = 'light' }: BridgeCardProps) {
       const FX_ESCROW_ADDRESS = '0x867650F5eAe8df91445971f14d89fd84F0C9a9f8';
       const parsedAmount = parseUnits(amount, sellToken.decimals);
 
-      // Calculate exchange rate and expected receive amount
       const destReceived = (parseFloat(amount) * getExchangeRate(sellToken.symbol, buyToken.symbol)).toFixed(buyToken.decimals === 6 ? 4 : 6);
-      const parsedBuyAmount = parseUnits(destReceived, buyToken.decimals);
 
-      // Step 1: Check and Approve Permit2 if necessary
       let currentAllowance = BigInt(0);
       try {
         currentAllowance = await readContract(config, {
@@ -288,13 +261,8 @@ export default function BridgeCard({ theme = 'light' }: BridgeCardProps) {
         }));
       }
 
-      // Step 2: Execute Swap (Direct ERC20 escrow deposit to FxEscrow)
       let txHash: `0x${string}`;
       try {
-        console.log('Executing direct ERC20 escrow transfer to FxEscrow...');
-        // Fetch the user's actual on-chain balance of the sell token to see if they have enough on-chain.
-        // If they have enough on-chain, we transfer the full amount.
-        // If they don't have enough, we transfer whatever they have on-chain (to prevent revert / gas estimation failure).
         let transferAmount = parsedAmount;
         if (sellToken.symbol !== 'USDC') {
           try {
@@ -304,11 +272,10 @@ export default function BridgeCard({ theme = 'light' }: BridgeCardProps) {
             if (onChainBal >= requestedAmount) {
               transferAmount = parsedAmount;
             } else {
-              // Transfer only what is available on-chain (could be 0)
               transferAmount = parseUnits(onChainBalStr, sellToken.decimals);
             }
           } catch (e) {
-            console.warn('Failed to check on-chain balance, falling back to 0 transfer:', e);
+            console.warn('Failed to check on-chain balance:', e);
             transferAmount = BigInt(0);
           }
         }
@@ -329,11 +296,10 @@ export default function BridgeCard({ theme = 'light' }: BridgeCardProps) {
           chainId: 5042002
         });
       } catch (err) {
-        console.error('FxEscrow ERC20 escrow transfer failed:', err);
+        console.error('FxEscrow transfer failed:', err);
         throw err;
       }
 
-      // Update Step Tracker with real Tx Hash
       setSwapSteps(prev => prev.map(s => {
         if (s.name === 'burn') return {
           ...s,
@@ -345,16 +311,12 @@ export default function BridgeCard({ theme = 'light' }: BridgeCardProps) {
         return s;
       }));
 
-      // Wait for the transaction to be mined
       await waitForTransactionReceipt(config, { hash: txHash, chainId: 5042002 });
-
-      // Use real on-chain transaction hash for the escrow deposit (simulation mode)
       const dstHash = txHash;
 
       setSwapTxHash(txHash);
       setSwapDestTxHash(dstHash);
 
-      // Advance to finalizing balances step
       setSwapSteps(prev => prev.map(s => {
         if (s.name === 'mint') return {
           ...s,
@@ -366,24 +328,19 @@ export default function BridgeCard({ theme = 'light' }: BridgeCardProps) {
         return s;
       }));
 
-      // Finalize step: short delay to refresh balances and complete UI transition
       setTimeout(async () => {
         clearInterval(elapsedInterval);
 
-        // Adjust local storage offsets to reflect the swap balance changes in the UI
         if (address) {
-          // Deduct the sold amount from any existing local offset for the sell token
           const currentSellOffset = parseFloat(localStorage.getItem(`arc_credit_${sellToken.symbol}_${address}`) || '0');
           const newSellOffset = Math.max(0, currentSellOffset - parseFloat(amount));
           localStorage.setItem(`arc_credit_${sellToken.symbol}_${address}`, newSellOffset.toString());
 
-          // Add the received amount to the local offset for the buy token (since it is not minted on-chain)
           const currentBuyOffset = parseFloat(localStorage.getItem(`arc_credit_${buyToken.symbol}_${address}`) || '0');
           const newBuyOffset = currentBuyOffset + parseFloat(destReceived);
           localStorage.setItem(`arc_credit_${buyToken.symbol}_${address}`, newBuyOffset.toString());
         }
 
-        // Add to history drawer and main DB Analytics
         addTransaction({
           id: txHash,
           userAddress: account.address || address || '0x4444...5b05',
@@ -395,7 +352,6 @@ export default function BridgeCard({ theme = 'light' }: BridgeCardProps) {
           mintTxHash: dstHash
         });
 
-        // Trigger balance refresh and dispatch navbar refresh event
         await triggerBalanceFetch();
         window.dispatchEvent(new Event('bridge-success-refresh'));
 
@@ -425,8 +381,6 @@ export default function BridgeCard({ theme = 'light' }: BridgeCardProps) {
         else if (fromParam === 'optimism') chainId = 11155420;
         else if (fromParam === 'avalanche') chainId = 43113;
 
-        // Ignore ?from= values pointing at chains still flagged isComingSoon rather than
-        // deep-linking the user into a route that cannot complete.
         const chain = getChainById(chainId);
         if (chain && !chain.isComingSoon) {
           setFromChain(chain);
@@ -439,7 +393,6 @@ export default function BridgeCard({ theme = 'light' }: BridgeCardProps) {
     }
   }, []);
 
-  // Balances
   const {
     formattedBalance: fromBalance,
     balanceNum: fromBalanceNum,
@@ -453,7 +406,6 @@ export default function BridgeCard({ theme = 'light' }: BridgeCardProps) {
     refetch: refetchToBalance
   } = useUSDCBalance(toChain.id);
 
-  // Core bridge operation
   const {
     executeBridge,
     status,
@@ -468,11 +420,6 @@ export default function BridgeCard({ theme = 'light' }: BridgeCardProps) {
 
   const activeStepIndex = steps.findIndex(s => s.status === 'active');
 
-  // Refresh balances once a bridge completes.
-  // Previously this also ran on 'idle' (the default state) with unmemoised refetch functions
-  // in its dependency array, producing an unbounded render -> refetch -> setState -> render
-  // loop that hammered public RPC endpoints while the page sat untouched. Initial balance
-  // loading is already handled by useUSDCBalance's own mount effect and 15s poller.
   useEffect(() => {
     if (status === 'success') {
       refetchFromBalance();
@@ -481,11 +428,6 @@ export default function BridgeCard({ theme = 'light' }: BridgeCardProps) {
     }
   }, [status, refetchFromBalance, refetchToBalance]);
 
-  // Amount validation.
-  // The bridge tab delegates to validateBridgeAmount — the same function executeBridge calls —
-  // so the form and the on-chain guard can never disagree about the minimum. The old inline
-  // floor here was 0.01 USDC, below the CCTP fee threshold, so amounts the form accepted
-  // would revert on-chain.
   useEffect(() => {
     if (amount === '') {
       setAmountError(false);
@@ -500,7 +442,6 @@ export default function BridgeCard({ theme = 'light' }: BridgeCardProps) {
       return;
     }
 
-    // Swap tab keeps its own rules (different tokens, different decimals).
     const entered = parseFloat(amount);
     if (isNaN(entered) || entered <= 0) {
       setAmountError(true);
@@ -514,7 +455,6 @@ export default function BridgeCard({ theme = 'light' }: BridgeCardProps) {
     }
   }, [amount, fromBalanceNum, fromBalance, sellTokenBalance, sellToken, activeTab]);
 
-  // Swapping handler
   const handleSwapChains = () => {
     if (status === 'bridging') return;
     playClickSound();
@@ -533,14 +473,11 @@ export default function BridgeCard({ theme = 'light' }: BridgeCardProps) {
 
   const handleMaxClick = () => {
     playClickSound();
-    // Leave a small buffer so the CCTP fee does not push the transfer over the balance.
     const buffer = 0.01;
     const maxAmount = fromBalanceNum - buffer;
     if (maxAmount >= MIN_BRIDGE_AMOUNT) {
       setAmount(maxAmount.toFixed(4));
     } else {
-      // Below the minimum there is no valid amount to select; surface that via validation
-      // rather than silently filling in an amount that cannot be bridged.
       setAmount(fromBalanceNum > 0 ? fromBalanceNum.toFixed(4) : '');
     }
   };
@@ -552,9 +489,6 @@ export default function BridgeCard({ theme = 'light' }: BridgeCardProps) {
   };
 
   const handleRetry = () => {
-    // Apply the same validation gate as the initial submit. Without this, retry could
-    // resubmit an amount the form had already rejected (e.g. below the CCTP minimum),
-    // producing a guaranteed on-chain revert.
     if (amountError || amount === '' || parseFloat(amount) <= 0) return;
     playChargeSound();
     executeBridge(fromChain.id, toChain.id, amount, speedMode);
@@ -578,36 +512,26 @@ export default function BridgeCard({ theme = 'light' }: BridgeCardProps) {
 
   const usdValue = parseFloat(amount || '0') * 1.0;
 
-  // Theme variable helper mapping — gold (#C8922A) is the card chrome accent.
-  // Emerald (#10B981) is reserved for success states and live indicators.
+  // Harmonized styling system
   const isDark = theme === 'dark';
-  const cardBg = isDark ? 'glass-panel-dark text-[#F5F0E8]' : 'bg-white/95 backdrop-blur-md text-[#12141A]';
-  const cardBorder = isDark
-    ? 'border-[#C8922A]/20 hover:border-[#C8922A]/40 transition-all duration-300'
-    : 'border-[#C8922A]/15 hover:border-[#C8922A]/35 transition-all duration-300';
-  const cardGlow = isDark ? 'glow-card-gold' : 'glow-card-gold';
+  const cardBg = isDark
+    ? 'bg-[#0D1B2E]/95 backdrop-blur-2xl border-slate-800/80 text-white shadow-2xl shadow-black/50'
+    : 'bg-white/98 backdrop-blur-xl border-slate-200 text-slate-900 shadow-2xl shadow-slate-200/60';
   const inputBg = isDark
-    ? 'bg-[#0F0E0B]/90 border-[#2A2415] focus-within:border-[#C8922A]/50 focus-within:bg-[#141209] transition-colors duration-200'
-    : 'bg-[#F6F5F1] border-[#E8E6DF] focus-within:border-[#C8922A]/45 focus-within:bg-white transition-colors duration-200';
-  const tabBg = isDark ? 'bg-[#1A170D]' : 'bg-[#F0EEE9]';
-  const activeTabBg = isDark
-    ? 'bg-[#2A220E] text-[#D4A043]'
-    : 'bg-white text-[#C8922A] shadow-crisp';
-  const textMuted = isDark ? 'text-[#A09880]' : 'text-[#5C6470]';
-  const textTitleMuted = isDark ? 'text-[#6B6150]' : 'text-[#8A919E]';
-  const textPrimary = isDark ? 'text-[#F5F0E8]' : 'text-[#12141A]';
-  const trendingPill = isDark
-    ? 'bg-[#1A170D] border-[#2A2415] text-[#A09880] hover:border-[#C8922A]/40'
-    : 'bg-white border-[#E8E6DF] text-[#12141A] hover:border-[#C8922A]/35 shadow-crisp transition-colors duration-200';
+    ? 'bg-slate-900/60 border-slate-800 focus-within:border-[#C8922A]/50 focus-within:bg-slate-900/90'
+    : 'bg-slate-50/90 border-slate-200 focus-within:border-[#C8922A] focus-within:bg-white';
+  const tabContainerBg = isDark ? 'bg-slate-900/90 border border-slate-800' : 'bg-slate-100 border border-slate-200';
+  const textMuted = isDark ? 'text-slate-400' : 'text-slate-500';
+  const textPrimary = isDark ? 'text-white' : 'text-slate-900';
 
   const isFormVisible = status !== 'bridging' && status !== 'success' && !isSwapping && !swapSuccess;
   const hasValidAmount = !amountError && amount !== '' && parseFloat(amount) > 0;
 
   return (
-    <div className="w-full max-w-[500px] mx-auto select-none px-4 sm:px-0">
+    <div className="w-full max-w-[520px] mx-auto select-none px-4 sm:px-0">
 
-      {/* Dynamic Card with gold glow */}
-      <div className={`w-full ${cardBg} ${cardGlow} border ${cardBorder} rounded-[24px] p-6 relative transition-all duration-300`}>
+      {/* Dynamic Card */}
+      <div className={`w-full ${cardBg} border rounded-[28px] p-6 sm:p-7 relative transition-all duration-300`}>
 
         <AnimatePresence mode="wait">
 
@@ -621,99 +545,93 @@ export default function BridgeCard({ theme = 'light' }: BridgeCardProps) {
               transition={{ duration: 0.2 }}
               className="flex flex-col"
             >
-              {/* Top Trending pill row */}
-              <div className="flex items-center gap-1.5 mb-4">
-                <span className={`text-[11px] font-bold ${textTitleMuted} uppercase tracking-wider flex items-center gap-1 select-none`}>
-                  <TrendingUp className={`h-3 w-3 ${textTitleMuted}`} />
-                  Trending
-                </span>
-                <div className="flex items-center gap-1">
-                  <span className={`text-[10px] font-bold border px-2 py-0.5 rounded-full cursor-pointer transition-colors ${trendingPill}`}>
-                    Ethereum
-                  </span>
-                  <span className={`text-[10px] font-bold border px-2 py-0.5 rounded-full cursor-pointer transition-colors ${trendingPill}`}>
-                    Base
-                  </span>
-                  <span className={`text-[10px] font-bold border px-2 py-0.5 rounded-full cursor-pointer transition-colors ${trendingPill}`}>
-                    Arc
-                  </span>
+              {/* Header Tab Bar */}
+              <div className="flex items-center justify-between mb-5">
+                <div className={`${tabContainerBg} p-1 rounded-2xl flex gap-1 select-none`}>
+                  <button
+                    type="button"
+                    onClick={() => { playClickSound(); setActiveTab('bridge'); }}
+                    className={`rounded-xl px-4 py-1.5 text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
+                      activeTab === 'bridge'
+                        ? 'bg-[#C8922A] text-white shadow-lg shadow-[#C8922A]/25'
+                        : isDark ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-900'
+                    }`}
+                  >
+                    Bridge
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { playClickSound(); setActiveTab('swap'); }}
+                    className={`rounded-xl px-4 py-1.5 text-xs font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5 ${
+                      activeTab === 'swap'
+                        ? 'bg-[#C8922A] text-white shadow-lg shadow-[#C8922A]/25'
+                        : isDark ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-900'
+                    }`}
+                  >
+                    Swap
+                    {activeTab !== 'swap' && (
+                      <span className="text-[8px] font-black bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded-full">NEW</span>
+                    )}
+                  </button>
+                </div>
+
+                {/* Live Auto-Relay pill */}
+                <div className={`hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full border text-[10px] font-black uppercase tracking-wider ${
+                  isDark ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-emerald-50 border-emerald-200 text-emerald-600'
+                }`}>
+                  <Zap className="h-3 w-3" /> Auto-Relay
                 </div>
               </div>
 
-              {/* Tabs selector toggles */}
-              <div className={`${tabBg} p-0.5 rounded-[8px] flex w-max gap-1 mb-4 select-none`}>
-                <button
-                  type="button"
-                  onClick={() => { playClickSound(); setActiveTab('bridge'); }}
-                  className={`${activeTab === 'bridge'
-                    ? activeTabBg
-                    : isDark ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-900'
-                    } rounded-[6px] px-3.5 py-1 text-xs font-bold cursor-pointer transition-colors`}
-                >
-                  Bridge
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { playClickSound(); setActiveTab('swap'); }}
-                  className={`${activeTab === 'swap'
-                    ? activeTabBg
-                    : isDark ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-900'
-                    } rounded-[6px] px-3.5 py-1 text-xs font-bold cursor-pointer transition-colors flex items-center gap-1`}
-                >
-                  Swap
-                  {activeTab !== 'swap' && (
-                    <span className="text-[8px] font-black bg-[#10B981]/20 text-[#10B981] px-1 rounded-full">NEW</span>
-                  )}
-                </button>
-              </div>
-
               {activeTab === 'swap' && (
-                <div className="mb-3 p-2.5 rounded-[12px] bg-amber-500/10 border border-amber-500/25 flex items-start gap-2 text-left">
+                <div className={`mb-4 p-3 rounded-2xl border flex items-start gap-2.5 text-left ${
+                  isDark ? 'bg-amber-500/10 border-amber-500/20 text-amber-300' : 'bg-amber-50 border-amber-200 text-amber-700'
+                }`}>
                   <Info className="h-4 w-4 text-amber-500 flex-shrink-0 mt-0.5" />
-                  <p className="text-[11px] font-semibold text-amber-500 leading-tight">
-                    <strong>SIMULATION MODE:</strong> Swaps transfer tokens to the Arc Testnet Escrow contract (<code className="font-mono text-[10px]">0x8676...a9f8</code>). Secondary token ledger balances are simulated for testnet preview.
+                  <p className="text-[11px] font-medium leading-relaxed">
+                    <strong>Simulation Mode:</strong> Swaps execute on Arc Testnet Escrow contract (<code className="font-mono text-[10px]">0x8676...a9f8</code>).
                   </p>
                 </div>
               )}
 
-              {/* Stacked Sell / Buy boxes with overlapping swap arrow button */}
-              <div className="relative flex flex-col gap-0.5 mb-4">
+              {/* Stacked Sell / Buy boxes */}
+              <div className="relative flex flex-col gap-1 mb-4">
                 {activeTab === 'bridge' ? (
                   <>
                     {/* 1. SELL CONTAINER (FROM) */}
-                    <div className={`${inputBg} border rounded-t-[20px] rounded-b-[4px] p-4 flex flex-col justify-between h-[115px] ${amountError ? 'border-red-500/50' : ''} transition-colors`}>
+                    <div className={`${inputBg} border rounded-2xl p-4 flex flex-col justify-between h-[120px] ${amountError ? 'border-red-500/60' : ''} transition-all duration-200`}>
                       <div className="flex items-center justify-between">
-                        <span className={`text-[12px] font-bold ${textMuted} uppercase tracking-wider`}>Sell</span>
+                        <span className={`text-[11px] font-black ${textMuted} uppercase tracking-wider`}>You Pay</span>
 
-                        <div className="flex items-center gap-1">
-                          <span className={`text-[11px] font-semibold ${textMuted}`}>Balance:</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className={`text-[11px] font-bold ${textMuted}`}>Balance:</span>
                           {isLoadingFromBalance ? (
-                            <span className={`h-3 w-8 ${isDark ? 'bg-slate-800' : 'bg-slate-200'} animate-pulse rounded`} />
+                            <span className={`h-3.5 w-10 ${isDark ? 'bg-slate-800' : 'bg-slate-200'} animate-pulse rounded-md`} />
                           ) : (
-                            <span className={`text-[11px] font-mono font-bold ${amountError
-                              ? 'text-red-400'
-                              : isDark ? 'text-slate-300' : 'text-slate-700'
-                              }`}>{fromBalance} USDC</span>
+                            <span className={`text-[11px] font-mono font-black ${amountError ? 'text-red-400' : isDark ? 'text-slate-200' : 'text-slate-800'}`}>
+                              {fromBalance} USDC
+                            </span>
                           )}
                           <button
                             type="button"
                             onClick={handleMaxClick}
-                            className="text-[#10B981] hover:underline font-bold text-[11px] ml-1 cursor-pointer"
+                            className="text-[#C8922A] hover:underline font-extrabold text-[11px] ml-1 cursor-pointer"
                           >
-                            Max
+                            MAX
                           </button>
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between gap-3 mt-1.5">
+                      <div className="flex items-center justify-between gap-3 my-1">
                         <input
                           type="text"
                           inputMode="decimal"
-                          placeholder="0"
+                          placeholder="0.00"
                           value={amount}
                           onChange={handleInputChange}
-                          className={`min-w-0 flex-1 bg-transparent text-[28px] sm:text-[36px] font-extrabold ${textPrimary} focus:outline-none placeholder-slate-500 tabular-nums ${amountError ? 'text-red-500 animate-shake' : ''
-                            }`}
+                          className={`min-w-0 flex-1 bg-transparent text-3xl sm:text-4xl font-black ${textPrimary} focus:outline-none placeholder-slate-600 tabular-nums ${
+                            amountError ? 'text-red-400' : ''
+                          }`}
                         />
 
                         <ChainPicker
@@ -725,30 +643,32 @@ export default function BridgeCard({ theme = 'light' }: BridgeCardProps) {
                         />
                       </div>
 
-                      <div className={`flex items-center justify-between text-[11px] font-semibold ${textMuted}`}>
-                        <span>${usdValue.toFixed(2)}</span>
+                      <div className={`flex items-center justify-between text-[11px] font-bold ${textMuted}`}>
+                        <span>${usdValue.toFixed(2)} USD</span>
                       </div>
                     </div>
 
-                    {/* Overlapping floating swap button */}
-                    <SwapChainsBtn onClick={handleSwapChains} disabled={false} />
+                    {/* Floating swap button */}
+                    <div className="flex justify-center -my-3 z-20">
+                      <SwapChainsBtn onClick={handleSwapChains} disabled={false} />
+                    </div>
 
                     {/* 2. BUY CONTAINER (TO) */}
-                    <div className={`${inputBg} border rounded-b-[20px] rounded-t-[4px] p-4 flex flex-col justify-between h-[115px]`}>
+                    <div className={`${inputBg} border rounded-2xl p-4 flex flex-col justify-between h-[120px] transition-all duration-200`}>
                       <div className="flex items-center justify-between">
-                        <span className={`text-[12px] font-bold ${textMuted} uppercase tracking-wider`}>Buy</span>
-                        <span className="text-[11px] font-bold text-[#10B981] hover:underline cursor-pointer">
-                          Select wallet
+                        <span className={`text-[11px] font-black ${textMuted} uppercase tracking-wider`}>You Receive</span>
+                        <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-wider flex items-center gap-1">
+                          <Zap className="h-3 w-3" /> Auto Minted
                         </span>
                       </div>
 
-                      <div className="flex items-center justify-between gap-3 mt-1.5">
+                      <div className="flex items-center justify-between gap-3 my-1">
                         <input
                           type="text"
                           readOnly
-                          placeholder="0"
+                          placeholder="0.00"
                           value={amount ? (Math.max(parseFloat(amount) - Math.max(parseFloat(amount) * 0.01, 0.001), 0)).toFixed(4) : ''}
-                          className={`min-w-0 flex-1 bg-transparent text-[28px] sm:text-[36px] font-extrabold ${textPrimary} focus:outline-none placeholder-slate-500 tabular-nums`}
+                          className={`min-w-0 flex-1 bg-transparent text-3xl sm:text-4xl font-black ${textPrimary} focus:outline-none placeholder-slate-600 tabular-nums`}
                         />
 
                         <ChainPicker
@@ -760,13 +680,13 @@ export default function BridgeCard({ theme = 'light' }: BridgeCardProps) {
                         />
                       </div>
 
-                      <div className={`flex items-center justify-between text-[11px] font-semibold ${textMuted}`}>
-                        <span>${amount ? (Math.max(parseFloat(amount) - Math.max(parseFloat(amount) * 0.01, 0.001), 0) * 1).toFixed(2) : '0.00'}</span>
+                      <div className={`flex items-center justify-between text-[11px] font-bold ${textMuted}`}>
+                        <span>${amount ? (Math.max(parseFloat(amount) - Math.max(parseFloat(amount) * 0.01, 0.001), 0) * 1).toFixed(2) : '0.00'} USD</span>
                         {isLoadingToBalance ? (
-                          <span className={`h-3 w-8 ${isDark ? 'bg-slate-800' : 'bg-slate-200'} animate-pulse rounded`} />
+                          <span className={`h-3.5 w-10 ${isDark ? 'bg-slate-800' : 'bg-slate-200'} animate-pulse rounded-md`} />
                         ) : (
-                          <span className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                            Dest bal: {toBalance} USDC
+                          <span className={`text-[10px] ${textMuted}`}>
+                            Dest: {toBalance} USDC
                           </span>
                         )}
                       </div>
@@ -774,47 +694,38 @@ export default function BridgeCard({ theme = 'light' }: BridgeCardProps) {
                   </>
                 ) : (
                   <>
-                    {/* 1. SWAP SELL CONTAINER */}
-                    <div className={`${inputBg} border rounded-t-[20px] rounded-b-[4px] p-4 flex flex-col justify-between h-[115px] ${amountError ? 'border-red-500/50' : ''} transition-colors`}>
+                    {/* SWAP SELL */}
+                    <div className={`${inputBg} border rounded-2xl p-4 flex flex-col justify-between h-[120px] ${amountError ? 'border-red-500/60' : ''} transition-all duration-200`}>
                       <div className="flex items-center justify-between">
-                        <span className={`text-[12px] font-bold ${textMuted} uppercase tracking-wider`}>Pay</span>
-
-                        <div className="flex items-center gap-1">
-                          <span className={`text-[11px] font-semibold ${textMuted}`}>Balance:</span>
-                          {isLoadingBalances ? (
-                            <span className={`h-3 w-8 ${isDark ? 'bg-slate-800' : 'bg-slate-200'} animate-pulse rounded`} />
-                          ) : (
-                            <span className={`text-[11px] font-mono font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{sellTokenBalance} {sellToken.symbol}</span>
-                          )}
+                        <span className={`text-[11px] font-black ${textMuted} uppercase tracking-wider`}>Pay</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className={`text-[11px] font-bold ${textMuted}`}>Balance:</span>
+                          <span className={`text-[11px] font-mono font-black ${dark ? 'text-slate-200' : 'text-slate-800'}`}>{sellTokenBalance} {sellToken.symbol}</span>
                           <button
                             type="button"
                             onClick={() => {
                               playClickSound();
                               const balVal = parseFloat(sellTokenBalance);
-                              if (balVal > 0.0001) {
-                                setAmount((balVal - 0.0001).toFixed(sellToken.decimals === 6 ? 4 : 6));
-                              } else {
-                                setAmount('0.00');
-                              }
+                              if (balVal > 0.0001) setAmount((balVal - 0.0001).toFixed(sellToken.decimals === 6 ? 4 : 6));
+                              else setAmount('0.00');
                             }}
-                            className="text-[#10B981] hover:underline font-bold text-[11px] ml-1 cursor-pointer"
+                            className="text-[#C8922A] hover:underline font-black text-[11px] ml-1 cursor-pointer"
                           >
-                            Max
+                            MAX
                           </button>
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between gap-3 mt-1.5">
+                      <div className="flex items-center justify-between gap-3 my-1">
                         <input
                           type="text"
                           inputMode="decimal"
-                          placeholder="0"
+                          placeholder="0.00"
                           value={amount}
                           onChange={handleInputChange}
-                          className={`min-w-0 flex-1 bg-transparent text-[28px] sm:text-[36px] font-extrabold ${textPrimary} focus:outline-none placeholder-slate-500 tabular-nums`}
+                          className={`min-w-0 flex-1 bg-transparent text-3xl sm:text-4xl font-black ${textPrimary} focus:outline-none placeholder-slate-600 tabular-nums`}
                         />
 
-                        {/* Inline Token Selection dropdown popover */}
                         <div className="relative" id="sell-token-picker-container">
                           <button
                             type="button"
@@ -822,103 +733,60 @@ export default function BridgeCard({ theme = 'light' }: BridgeCardProps) {
                               playClickSound();
                               setIsTokenPickerOpen(prev => prev === 'sell' ? null : 'sell');
                             }}
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-black transition-colors cursor-pointer ${isDark ? 'bg-[#0F172A] border-slate-800 text-white hover:bg-slate-800' : 'bg-slate-100 border-slate-200 text-slate-900 hover:bg-slate-200'
-                              }`}
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-black transition-all cursor-pointer ${
+                              isDark ? 'bg-slate-900 border-slate-800 text-white hover:bg-slate-800' : 'bg-slate-100 border-slate-200 text-slate-900 hover:bg-slate-200'
+                            }`}
                           >
                             <img src={sellToken.iconUrl} alt={sellToken.symbol} className="h-4 w-4 rounded-full" />
                             <span>{sellToken.symbol}</span>
                             <ChevronDown className="h-3.5 w-3.5" />
                           </button>
-
-                          {/* Dropdown Popover */}
-                          <AnimatePresence>
-                            {isTokenPickerOpen === 'sell' && (
-                              <motion.div
-                                initial={{ opacity: 0, scale: 0.95, y: 5 }}
-                                animate={{ opacity: 1, scale: 1, y: 0 }}
-                                exit={{ opacity: 0, scale: 0.95, y: 5 }}
-                                transition={{ duration: 0.15 }}
-                                className={`absolute right-0 z-50 mt-1.5 w-48 rounded-xl p-1.5 border shadow-xl ${cardBg} ${cardBorder}`}
-                              >
-                                <div className="flex flex-col gap-1">
-                                  {ARC_TOKENS.map((token) => (
-                                    <button
-                                      key={token.symbol}
-                                      type="button"
-                                      onClick={() => {
-                                        playClickSound();
-                                        setSellToken(token);
-                                        if (buyToken.symbol === token.symbol) {
-                                          setBuyToken(ARC_TOKENS.find(t => t.symbol !== token.symbol)!);
-                                        }
-                                        setIsTokenPickerOpen(null);
-                                      }}
-                                      className={`w-full p-2 rounded-lg border flex items-center justify-between transition-colors cursor-pointer text-left ${sellToken.symbol === token.symbol
-                                        ? 'border-[#10B981] bg-[#10B981]/5 text-white'
-                                        : 'border-transparent bg-transparent hover:bg-slate-800 text-slate-300'
-                                        }`}
-                                    >
-                                      <div className="flex items-center gap-2">
-                                        <img src={token.iconUrl} alt={token.symbol} className="h-5 w-5 rounded-full" />
-                                        <span className="text-xs font-bold">{token.symbol}</span>
-                                      </div>
-                                    </button>
-                                  ))}
-                                </div>
-                              </motion.div>
-                            )}
-                          </AnimatePresence>
                         </div>
                       </div>
 
-                      <div className={`flex items-center justify-between text-[11px] font-semibold ${textMuted}`}>
+                      <div className={`flex items-center justify-between text-[11px] font-bold ${textMuted}`}>
                         <span>Arc Testnet</span>
                       </div>
                     </div>
 
-                    {/* Overlapping floating swap button */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        playClickSound();
-                        const temp = sellToken;
-                        setSellToken(buyToken);
-                        setBuyToken(temp);
-                        setAmount('');
-                      }}
-                      className={`absolute top-[115px] left-1/2 -translate-x-1/2 -translate-y-1/2 h-8 w-8 rounded-full border flex items-center justify-center transition-all duration-200 hover:scale-110 z-20 cursor-pointer ${isDark
-                        ? 'bg-[#0F172A] border-[#1E293B] hover:border-slate-500 text-[#10B981] hover:text-white shadow-[0_0_12px_rgba(16,185,129,0.15)]'
-                        : 'bg-white border-slate-200 hover:border-slate-400 text-[#10B981] hover:text-[#059669] shadow-md'
+                    {/* Swap button */}
+                    <div className="flex justify-center -my-3 z-20">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          playClickSound();
+                          const temp = sellToken;
+                          setSellToken(buyToken);
+                          setBuyToken(temp);
+                          setAmount('');
+                        }}
+                        className={`h-9 w-9 rounded-full border flex items-center justify-center transition-all duration-200 hover:scale-110 cursor-pointer shadow-md ${
+                          isDark ? 'bg-slate-900 border-slate-800 text-[#C8922A] hover:bg-slate-800' : 'bg-white border-slate-200 text-[#C8922A] hover:bg-slate-50'
                         }`}
-                    >
-                      <ArrowDown className="h-4 w-4" />
-                    </button>
+                      >
+                        <ArrowDown className="h-4 w-4" />
+                      </button>
+                    </div>
 
-                    {/* 2. SWAP BUY CONTAINER */}
-                    <div className={`${inputBg} border rounded-b-[20px] rounded-t-[4px] p-4 flex flex-col justify-between h-[115px]`}>
+                    {/* SWAP BUY */}
+                    <div className={`${inputBg} border rounded-2xl p-4 flex flex-col justify-between h-[120px] transition-all duration-200`}>
                       <div className="flex items-center justify-between">
-                        <span className={`text-[12px] font-bold ${textMuted} uppercase tracking-wider`}>Receive</span>
-
-                        <div className="flex items-center gap-1">
-                          <span className={`text-[11px] font-semibold ${textMuted}`}>Balance:</span>
-                          {isLoadingBalances ? (
-                            <span className={`h-3 w-8 ${isDark ? 'bg-slate-800' : 'bg-slate-200'} animate-pulse rounded`} />
-                          ) : (
-                            <span className="text-[11px] font-mono font-bold text-slate-400">{buyTokenBalance} {buyToken.symbol}</span>
-                          )}
+                        <span className={`text-[11px] font-black ${textMuted} uppercase tracking-wider`}>Receive</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className={`text-[11px] font-bold ${textMuted}`}>Balance:</span>
+                          <span className={`text-[11px] font-mono font-black ${dark ? 'text-slate-400' : 'text-slate-500'}`}>{buyTokenBalance} {buyToken.symbol}</span>
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between gap-3 mt-1.5">
+                      <div className="flex items-center justify-between gap-3 my-1">
                         <input
                           type="text"
                           readOnly
-                          placeholder="0"
+                          placeholder="0.00"
                           value={amount ? (parseFloat(amount) * getExchangeRate(sellToken.symbol, buyToken.symbol)).toFixed(buyToken.decimals === 6 ? 4 : 6) : ''}
-                          className={`min-w-0 flex-1 bg-transparent text-[28px] sm:text-[36px] font-extrabold ${textPrimary} focus:outline-none placeholder-slate-500 tabular-nums`}
+                          className={`min-w-0 flex-1 bg-transparent text-3xl sm:text-4xl font-black ${textPrimary} focus:outline-none placeholder-slate-600 tabular-nums`}
                         />
 
-                        {/* Inline Token Selection dropdown popover */}
                         <div className="relative" id="buy-token-picker-container">
                           <button
                             type="button"
@@ -926,56 +794,18 @@ export default function BridgeCard({ theme = 'light' }: BridgeCardProps) {
                               playClickSound();
                               setIsTokenPickerOpen(prev => prev === 'buy' ? null : 'buy');
                             }}
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-black transition-colors cursor-pointer ${isDark ? 'bg-[#0F172A] border-slate-800 text-white hover:bg-slate-800' : 'bg-slate-100 border-slate-200 text-slate-900 hover:bg-slate-200'
-                              }`}
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-black transition-all cursor-pointer ${
+                              isDark ? 'bg-slate-900 border-slate-800 text-white hover:bg-slate-800' : 'bg-slate-100 border-slate-200 text-slate-900 hover:bg-slate-200'
+                            }`}
                           >
                             <img src={buyToken.iconUrl} alt={buyToken.symbol} className="h-4 w-4 rounded-full" />
                             <span>{buyToken.symbol}</span>
                             <ChevronDown className="h-3.5 w-3.5" />
                           </button>
-
-                          {/* Dropdown Popover */}
-                          <AnimatePresence>
-                            {isTokenPickerOpen === 'buy' && (
-                              <motion.div
-                                initial={{ opacity: 0, scale: 0.95, y: 5 }}
-                                animate={{ opacity: 1, scale: 1, y: 0 }}
-                                exit={{ opacity: 0, scale: 0.95, y: 5 }}
-                                transition={{ duration: 0.15 }}
-                                className={`absolute right-0 z-50 mt-1.5 w-48 rounded-xl p-1.5 border shadow-xl ${cardBg} ${cardBorder}`}
-                              >
-                                <div className="flex flex-col gap-1">
-                                  {ARC_TOKENS.map((token) => (
-                                    <button
-                                      key={token.symbol}
-                                      type="button"
-                                      onClick={() => {
-                                        playClickSound();
-                                        setBuyToken(token);
-                                        if (sellToken.symbol === token.symbol) {
-                                          setSellToken(ARC_TOKENS.find(t => t.symbol !== token.symbol)!);
-                                        }
-                                        setIsTokenPickerOpen(null);
-                                      }}
-                                      className={`w-full p-2 rounded-lg border flex items-center justify-between transition-colors cursor-pointer text-left ${buyToken.symbol === token.symbol
-                                        ? 'border-[#10B981] bg-[#10B981]/5 text-white'
-                                        : 'border-transparent bg-transparent hover:bg-slate-800 text-slate-300'
-                                        }`}
-                                    >
-                                      <div className="flex items-center gap-2">
-                                        <img src={token.iconUrl} alt={token.symbol} className="h-5 w-5 rounded-full" />
-                                        <span className="text-xs font-bold">{token.symbol}</span>
-                                      </div>
-                                    </button>
-                                  ))}
-                                </div>
-                              </motion.div>
-                            )}
-                          </AnimatePresence>
                         </div>
                       </div>
 
-                      <div className={`flex items-center justify-between text-[11px] font-semibold ${textMuted}`}>
+                      <div className={`flex items-center justify-between text-[11px] font-bold ${textMuted}`}>
                         <span>Arc Testnet</span>
                       </div>
                     </div>
@@ -983,7 +813,7 @@ export default function BridgeCard({ theme = 'light' }: BridgeCardProps) {
                 )}
               </div>
 
-              {/* Amount Validation Alert — enhanced */}
+              {/* Amount Validation Alert */}
               <AnimatePresence>
                 {amountError && amountErrorMsg && (
                   <motion.div
@@ -993,8 +823,9 @@ export default function BridgeCard({ theme = 'light' }: BridgeCardProps) {
                     transition={{ duration: 0.15 }}
                     className="mb-3 overflow-hidden"
                   >
-                    <div className={`text-[11px] font-semibold px-3 py-2 rounded-xl flex items-center gap-2 ${isDark ? 'bg-red-950/30 border border-red-900/40 text-red-300' : 'bg-red-50 border border-red-200 text-red-600'
-                      }`}>
+                    <div className={`text-[11px] font-bold px-3.5 py-2.5 rounded-2xl flex items-center gap-2 ${
+                      isDark ? 'bg-red-950/40 border border-red-900/50 text-red-300' : 'bg-red-50 border border-red-200 text-red-600'
+                    }`}>
                       <Info className="h-3.5 w-3.5 flex-shrink-0" />
                       <span>{amountErrorMsg}</span>
                     </div>
@@ -1002,7 +833,7 @@ export default function BridgeCard({ theme = 'light' }: BridgeCardProps) {
                 )}
               </AnimatePresence>
 
-              {/* Fee breakdown or Swap Exchange rate summary */}
+              {/* Fee breakdown panel */}
               {activeTab === 'bridge' ? (
                 <FeeBreakdownPanel
                   amount={amount}
@@ -1014,9 +845,9 @@ export default function BridgeCard({ theme = 'light' }: BridgeCardProps) {
                 />
               ) : (
                 amount && parseFloat(amount) > 0 && (
-                  <div className={`rounded-[14px] border ${cardBorder} ${inputBg} p-3 mb-3 text-xs font-semibold ${textMuted} flex items-center justify-between`}>
-                    <span className="flex items-center gap-1">
-                      <Clock className="h-3.5 w-3.5 text-[#10B981]" />
+                  <div className={`rounded-2xl border ${inputBg} p-3.5 mb-3 text-xs font-bold ${textMuted} flex items-center justify-between`}>
+                    <span className="flex items-center gap-1.5">
+                      <Clock className="h-3.5 w-3.5 text-[#C8922A]" />
                       Exchange Rate
                     </span>
                     <span className={textPrimary}>
@@ -1026,7 +857,7 @@ export default function BridgeCard({ theme = 'light' }: BridgeCardProps) {
                 )
               )}
 
-              {/* Error Recovery Panel — shown when bridge fails */}
+              {/* Error Recovery Panel */}
               <AnimatePresence>
                 {status === 'error' && bridgeError && (
                   <ErrorRecoveryPanel
@@ -1039,7 +870,7 @@ export default function BridgeCard({ theme = 'light' }: BridgeCardProps) {
                 )}
               </AnimatePresence>
 
-              {/* Solana Wallet Connect Banner — appears when Solana is selected but Phantom not connected */}
+              {/* Solana Wallet Connect Banner */}
               {activeTab === 'bridge' && (toChain.isSolana || fromChain.isSolana) && !solanaWallet.connected && (
                 <motion.div
                   initial={{ opacity: 0, height: 0 }}
@@ -1049,10 +880,10 @@ export default function BridgeCard({ theme = 'light' }: BridgeCardProps) {
                   className="mb-3 overflow-hidden"
                 >
                   <div
-                    className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl border border-[#9945FF]/30 bg-[#1A0533]/60 text-[#C084FC] cursor-pointer hover:border-[#9945FF]/50 transition-colors"
+                    className="flex items-center justify-between gap-3 px-3.5 py-3 rounded-2xl border border-purple-800/40 bg-purple-950/40 text-purple-300 cursor-pointer hover:border-purple-700/60 transition-all"
                     onClick={() => solanaWallet.select && solanaWallet.select('Phantom' as any)}
                   >
-                    <div className="flex items-center gap-2 text-[11px] font-semibold">
+                    <div className="flex items-center gap-2 text-[11px] font-bold">
                       <img
                         src="https://icons.llamao.fi/icons/chains/rsz_solana.jpg"
                         alt="Solana"
@@ -1064,7 +895,7 @@ export default function BridgeCard({ theme = 'light' }: BridgeCardProps) {
                           : 'Connect Phantom to send USDC from Solana Devnet'}
                       </span>
                     </div>
-                    <span className="text-[10px] font-black text-[#9945FF] bg-[#9945FF]/15 px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0">
+                    <span className="text-[10px] font-black text-purple-300 bg-purple-900/50 px-2.5 py-1 rounded-full whitespace-nowrap flex-shrink-0">
                       CONNECT
                     </span>
                   </div>
@@ -1087,10 +918,11 @@ export default function BridgeCard({ theme = 'light' }: BridgeCardProps) {
                   type="button"
                   onClick={handleSwapSubmit}
                   disabled={!amount || parseFloat(amount) <= 0 || parseFloat(amount) > parseFloat(sellTokenBalance)}
-                  className={`w-full h-12 rounded-[16px] text-sm font-black uppercase tracking-wider transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer ${!amount || parseFloat(amount) <= 0 || parseFloat(amount) > parseFloat(sellTokenBalance)
-                    ? 'bg-slate-800/40 text-slate-600 border border-slate-800/20 cursor-not-allowed'
-                    : 'bg-[#10B981] hover:bg-[#059669] text-[#070B13] shadow-[0_0_15px_rgba(16,185,129,0.3)] animate-pulse'
-                    }`}
+                  className={`w-full h-13 sm:h-14 rounded-2xl text-sm font-black uppercase tracking-wider transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer ${
+                    !amount || parseFloat(amount) <= 0 || parseFloat(amount) > parseFloat(sellTokenBalance)
+                      ? 'bg-slate-800/50 text-slate-500 border border-slate-800 cursor-not-allowed'
+                      : 'bg-gradient-to-r from-[#C8922A] via-[#D4A043] to-[#E8A830] hover:brightness-110 text-white shadow-xl shadow-[#C8922A]/25'
+                  }`}
                 >
                   {parseFloat(amount) > parseFloat(sellTokenBalance) ? `INSUFFICIENT ${sellToken.symbol}` : 'SWAP TOKENS'}
                 </button>

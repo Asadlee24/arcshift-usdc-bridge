@@ -1,5 +1,5 @@
 // app/page.tsx
-// Main application homepage rendering the complete Arc Bridge experience and integrating 3D reactive canvases (Supports Dark/Light Themes dynamically)
+// Main application homepage rendering the complete Arc Bridge experience and integrating 3D reactive canvases
 
 'use client';
 
@@ -27,14 +27,14 @@ function DeveloperSpotlight({ theme = 'light' }: SpotlightProps) {
   const isDark = theme === 'dark';
 
   const cardBg = isDark
-    ? 'glass-panel-dark border-[#C8922A]/25 hover:border-[#C8922A]/45'
-    : 'bg-white/95 border-[#E8E6DF] shadow-crisp-lg hover:border-[#C8922A]/35';
-  const headingColor = isDark ? 'text-[#F5F0E8]' : 'text-slate-900';
-  const descColor = isDark ? 'text-[#A09880]' : 'text-slate-600';
+    ? 'bg-[#0D1B2E]/90 border-slate-800 text-white shadow-xl'
+    : 'bg-white border-slate-200 shadow-xl text-slate-900';
+  const headingColor = isDark ? 'text-white' : 'text-slate-900';
+  const descColor = isDark ? 'text-slate-400' : 'text-slate-600';
 
   return (
     <div className="w-full max-w-5xl mx-auto py-4 sm:py-6 px-4 select-none mb-10">
-      <div className={`${cardBg} border rounded-[20px] p-5 sm:p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-5 sm:gap-6 transition-all duration-300`}>
+      <div className={`${cardBg} border rounded-2xl p-5 sm:p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-5 sm:gap-6 transition-all duration-300`}>
         
         {/* Left column: Security description */}
         <div className="flex items-center sm:items-start md:items-center gap-4 flex-col sm:flex-row text-center sm:text-left">
@@ -42,7 +42,7 @@ function DeveloperSpotlight({ theme = 'light' }: SpotlightProps) {
             <Shield className="h-6 w-6 text-[#C8922A]" />
           </div>
           <div>
-            <span className="inline-block text-[10px] font-black text-[#C8922A] bg-[#C8922A]/15 px-2.5 py-0.5 rounded-[4px] tracking-wider uppercase mb-1.5 border border-[#C8922A]/30">
+            <span className="inline-block text-[10px] font-black text-[#C8922A] bg-[#C8922A]/15 px-2.5 py-0.5 rounded-md tracking-wider uppercase mb-1.5 border border-[#C8922A]/30">
               SECURITY AUDITED
             </span>
             <h3 className={`text-[16px] font-bold ${headingColor}`}>
@@ -59,7 +59,7 @@ function DeveloperSpotlight({ theme = 'light' }: SpotlightProps) {
           href="https://asad-lee-portfolio.vercel.app"
           target="_blank"
           rel="noopener noreferrer"
-          className="w-full sm:w-auto flex-shrink-0 h-11 px-6 rounded-[10px] bg-[#C8922A] hover:bg-[#A87520] text-white text-xs font-bold flex items-center justify-center transition-colors shadow-sm select-none cursor-pointer"
+          className="w-full sm:w-auto flex-shrink-0 h-11 px-6 rounded-xl bg-gradient-to-r from-[#C8922A] via-[#D4A043] to-[#E8A830] hover:brightness-110 text-white text-xs font-bold flex items-center justify-center transition-all shadow-md shadow-[#C8922A]/20 select-none cursor-pointer"
         >
           View Developer Portfolio
         </a>
@@ -79,7 +79,6 @@ export default function Home() {
   const [isWidgetMode, setIsWidgetMode] = useState(false);
   const [forcedTheme, setForcedTheme] = useState<'dark' | 'light' | null>(null);
 
-  // Load user theme preference or widget preferences if any
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
@@ -99,7 +98,6 @@ export default function Home() {
     }
   }, []);
 
-  // Sync theme with document class list
   useEffect(() => {
     if (typeof window !== 'undefined') {
       if (theme === 'dark') {
@@ -117,18 +115,16 @@ export default function Home() {
   };
 
   const isDark = theme === 'dark';
-  // Dark mode uses warm dark #0B0A07 (gold identity). Light mode uses the
-  // arc-canvas class (gold-tinted grid + soft washes, defined in globals.css).
   const pageBg = isDark
-    ? 'bg-[#0B0A07] text-[#F5F0E8]'
-    : 'arc-canvas text-[#12141A]';
+    ? 'bg-[#060D1A] text-white'
+    : 'bg-slate-50 text-slate-900';
 
   if (isWidgetMode) {
     const activeTheme = forcedTheme || theme;
     const isWidgetDark = activeTheme === 'dark';
     return (
       <div className={`fixed inset-0 flex items-center justify-center p-4 overflow-hidden ${
-        isWidgetDark ? 'bg-[#070B13]' : 'bg-transparent'
+        isWidgetDark ? 'bg-[#060D1A]' : 'bg-transparent'
       }`}>
         <BridgeCard theme={activeTheme} />
       </div>
@@ -138,7 +134,7 @@ export default function Home() {
   return (
     <div className={`relative min-h-screen flex flex-col z-10 ${pageBg} transition-colors duration-300`}>
       
-      {/* 3D Background Canvas — Reactive to Wallet Connection and Active Theme */}
+      {/* 3D Background Canvas */}
       <ArcBackground isWalletConnected={isConnected} theme={theme} />
 
       {/* Header Navigation */}
@@ -162,7 +158,6 @@ export default function Home() {
         <div className="w-full flex justify-center items-center py-4">
           <BridgeCard theme={theme} />
         </div>
-
 
         {/* Promo Features Grid Section */}
         <PromoSection theme={theme} />
