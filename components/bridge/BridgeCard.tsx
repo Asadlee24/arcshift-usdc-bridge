@@ -700,7 +700,7 @@ export default function BridgeCard({ theme = 'light' }: BridgeCardProps) {
                         <span className={`text-[11px] font-black ${textMuted} uppercase tracking-wider`}>Pay</span>
                         <div className="flex items-center gap-1.5">
                           <span className={`text-[11px] font-bold ${textMuted}`}>Balance:</span>
-                          <span className={`text-[11px] font-mono font-black ${dark ? 'text-slate-200' : 'text-slate-800'}`}>{sellTokenBalance} {sellToken.symbol}</span>
+                          <span className={`text-[11px] font-mono font-black ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{sellTokenBalance} {sellToken.symbol}</span>
                           <button
                             type="button"
                             onClick={() => {
@@ -774,7 +774,7 @@ export default function BridgeCard({ theme = 'light' }: BridgeCardProps) {
                         <span className={`text-[11px] font-black ${textMuted} uppercase tracking-wider`}>Receive</span>
                         <div className="flex items-center gap-1.5">
                           <span className={`text-[11px] font-bold ${textMuted}`}>Balance:</span>
-                          <span className={`text-[11px] font-mono font-black ${dark ? 'text-slate-400' : 'text-slate-500'}`}>{buyTokenBalance} {buyToken.symbol}</span>
+                          <span className={`text-[11px] font-mono font-black ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{buyTokenBalance} {buyToken.symbol}</span>
                         </div>
                       </div>
 
