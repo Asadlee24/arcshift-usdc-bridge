@@ -149,7 +149,7 @@ export default function Home() {
       />
 
       {/* Main Content Area */}
-      <main className="flex-1 flex flex-col justify-start items-center py-6 sm:py-10">
+      <main className="flex-1 flex flex-col justify-start items-center pt-2 pb-6 sm:pt-4 sm:pb-10">
         
         {/* Above-the-fold Hero */}
         <HeroSection theme={theme} />

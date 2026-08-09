@@ -100,7 +100,8 @@ function LogoBridge3D({ phase, theme }: { phase: BridgePhase; theme: 'dark' | 'l
 
     // Gentle ambient floating & subtle sway matching logo majesty
     groupRef.current.rotation.y = Math.sin(t * 0.2) * 0.05;
-    groupRef.current.position.y = Math.sin(t * 0.4) * 0.04 - 0.2;
+    // Reduced float amplitude, centered Y so bridge is fully visible
+    groupRef.current.position.y = Math.sin(t * 0.4) * 0.03 - 0.5;
 
     const pulse = phase === 'idle' ? 0.75 : 1.2;
     goldMat.emissiveIntensity = (isDark ? 0.65 : 0.4) + Math.sin(t * pulse * 2) * 0.15;
@@ -407,11 +408,20 @@ export default function ArcBackground({ isWalletConnected = false, theme = 'dark
   const [mounted, setMounted] = useState(false);
   const [phase, setPhase] = useState<BridgePhase>('idle');
   const [prefersReduced, setPrefersReduced] = useState(false);
-  const [particleCount, setParticleCount] = useState(120);
+  const [particleCount, setParticleCount] = useState(80);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   useEffect(() => {
     const cores = navigator.hardwareConcurrency ?? 4;
-    const base = cores >= 8 ? 180 : cores >= 4 ? 130 : 70;
+    const isMobileDevice = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+    const base = isMobileDevice ? 40 : cores >= 8 ? 160 : cores >= 4 ? 110 : 60;
     setParticleCount(base);
   }, []);
 
@@ -454,6 +464,10 @@ export default function ArcBackground({ isWalletConnected = false, theme = 'dark
     ? 'bg-[radial-gradient(ellipse_80%_65%_at_50%_40%,#1C1C1C_0%,rgba(200,146,42,0.12)_45%,#0A0A0A_100%)]'
     : 'bg-[radial-gradient(ellipse_80%_65%_at_50%_40%,rgba(244,217,138,0.18)_0%,rgba(200,146,42,0.06)_55%,#FAF7F0_100%)]';
 
+  // On mobile: wider FOV and slightly lower camera to show the bridge fully
+  const cameraPos: [number, number, number] = isMobile ? [0, 0.2, 9.5] : [0, 0.8, 6.8];
+  const cameraFov = isMobile ? 60 : 52;
+
   return (
     <div className={`fixed inset-0 z-[-1] pointer-events-none w-screen h-screen select-none overflow-hidden ${wrapperBg} transition-colors duration-500`}>
       {/* Radial Gold Ambient Background overlay */}
@@ -467,9 +481,9 @@ export default function ArcBackground({ isWalletConnected = false, theme = 'dark
             linear-gradient(to right, rgba(200,146,42,${isDark ? '0.05' : '0.03'}) 1px, transparent 1px),
             linear-gradient(to bottom, rgba(200,146,42,${isDark ? '0.05' : '0.03'}) 1px, transparent 1px)
           `,
-          backgroundSize: '80px 80px',
-          maskImage: 'radial-gradient(ellipse 80% 80% at 50% 50%, black 40%, transparent 100%)',
-          WebkitMaskImage: 'radial-gradient(ellipse 80% 80% at 50% 50%, black 40%, transparent 100%)',
+          backgroundSize: isMobile ? '50px 50px' : '80px 80px',
+          maskImage: 'radial-gradient(ellipse 90% 90% at 50% 50%, black 40%, transparent 100%)',
+          WebkitMaskImage: 'radial-gradient(ellipse 90% 90% at 50% 50%, black 40%, transparent 100%)',
         }}
       />
 
@@ -478,10 +492,10 @@ export default function ArcBackground({ isWalletConnected = false, theme = 'dark
         <StaticFallback theme={theme} />
       ) : (
         <Canvas
-          camera={{ position: [0, 0.8, 6.8], fov: 52 }}
-          dpr={[1, Math.min(window.devicePixelRatio, 2)]}
-          gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}
-          style={{ width: '100vw', height: '100vh' }}
+          camera={{ position: cameraPos, fov: cameraFov }}
+          dpr={[1, isMobile ? 1 : Math.min(window.devicePixelRatio, 2)]}
+          gl={{ antialias: !isMobile, alpha: true, powerPreference: 'high-performance' }}
+          style={{ width: '100%', height: '100%' }}
         >
           <BridgeScene phase={phase} theme={theme} particleCount={particleCount} />
         </Canvas>

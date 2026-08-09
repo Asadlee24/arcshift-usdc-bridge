@@ -146,7 +146,7 @@ export default function ChainPicker({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.98, y: 4 }}
             transition={{ duration: 0.15, ease: 'easeOut' }}
-            className={`absolute right-0 z-50 mt-1.5 w-64 rounded-[12px] p-2 border shadow-relay-dropdown ${popoverStyle}`}
+            className={`absolute right-0 z-50 mt-1.5 w-[min(264px,80vw)] rounded-[12px] p-2 border shadow-relay-dropdown ${popoverStyle}`}
           >
             {/* Search Input Box */}
             <div className={`flex items-center gap-1.5 rounded-[8px] px-2 py-1.5 mb-2 border ${searchBg}`}>

@@ -37,7 +37,7 @@ export default function HeroSection({ theme = 'light' }: HeroSectionProps) {
   });
 
   return (
-    <div className="w-full select-none max-w-3xl mx-auto flex flex-col items-center text-center px-4 py-8 sm:py-12">
+    <div className="w-full select-none max-w-3xl mx-auto flex flex-col items-center text-center px-4 pt-10 pb-6 sm:pt-14 sm:pb-10">
 
       {/* Eyebrow pill */}
       <motion.div

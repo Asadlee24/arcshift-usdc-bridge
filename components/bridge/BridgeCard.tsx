@@ -528,10 +528,10 @@ export default function BridgeCard({ theme = 'light' }: BridgeCardProps) {
   const hasValidAmount = !amountError && amount !== '' && parseFloat(amount) > 0;
 
   return (
-    <div className="w-full max-w-[520px] mx-auto select-none px-4 sm:px-0">
+    <div className="w-full max-w-[520px] mx-auto select-none px-3 sm:px-0">
 
       {/* Dynamic Card */}
-      <div className={`w-full ${cardBg} border rounded-[28px] p-6 sm:p-7 relative transition-all duration-300`}>
+      <div className={`w-full ${cardBg} border rounded-3xl p-4 sm:p-6 md:p-7 relative transition-all duration-300`}>
 
         <AnimatePresence mode="wait">
 
@@ -599,7 +599,7 @@ export default function BridgeCard({ theme = 'light' }: BridgeCardProps) {
                 {activeTab === 'bridge' ? (
                   <>
                     {/* 1. SELL CONTAINER (FROM) */}
-                    <div className={`${inputBg} border rounded-2xl p-4 flex flex-col justify-between h-[120px] ${amountError ? 'border-red-500/60' : ''} transition-all duration-200`}>
+                    <div className={`${inputBg} border rounded-2xl p-3.5 sm:p-4 flex flex-col justify-between min-h-[110px] sm:min-h-[120px] ${amountError ? 'border-red-500/60' : ''} transition-all duration-200`}>
                       <div className="flex items-center justify-between">
                         <span className={`text-[11px] font-black ${textMuted} uppercase tracking-wider`}>You Pay</span>
 
@@ -629,7 +629,7 @@ export default function BridgeCard({ theme = 'light' }: BridgeCardProps) {
                           placeholder="0.00"
                           value={amount}
                           onChange={handleInputChange}
-                          className={`min-w-0 flex-1 bg-transparent text-3xl sm:text-4xl font-black ${textPrimary} focus:outline-none placeholder-slate-600 tabular-nums ${
+                         className={`min-w-0 flex-1 bg-transparent text-2xl sm:text-3xl md:text-4xl font-black ${textPrimary} focus:outline-none placeholder-slate-600 tabular-nums ${
                             amountError ? 'text-red-400' : ''
                           }`}
                         />
@@ -654,7 +654,7 @@ export default function BridgeCard({ theme = 'light' }: BridgeCardProps) {
                     </div>
 
                     {/* 2. BUY CONTAINER (TO) */}
-                    <div className={`${inputBg} border rounded-2xl p-4 flex flex-col justify-between h-[120px] transition-all duration-200`}>
+                    <div className={`${inputBg} border rounded-2xl p-3.5 sm:p-4 flex flex-col justify-between min-h-[110px] sm:min-h-[120px] transition-all duration-200`}>
                       <div className="flex items-center justify-between">
                         <span className={`text-[11px] font-black ${textMuted} uppercase tracking-wider`}>You Receive</span>
                         <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-wider flex items-center gap-1">
@@ -668,7 +668,7 @@ export default function BridgeCard({ theme = 'light' }: BridgeCardProps) {
                           readOnly
                           placeholder="0.00"
                           value={amount ? (Math.max(parseFloat(amount) - Math.max(parseFloat(amount) * 0.01, 0.001), 0)).toFixed(4) : ''}
-                          className={`min-w-0 flex-1 bg-transparent text-3xl sm:text-4xl font-black ${textPrimary} focus:outline-none placeholder-slate-600 tabular-nums`}
+                          className={`min-w-0 flex-1 bg-transparent text-2xl sm:text-3xl md:text-4xl font-black ${textPrimary} focus:outline-none placeholder-slate-600 tabular-nums`}
                         />
 
                         <ChainPicker
@@ -695,7 +695,7 @@ export default function BridgeCard({ theme = 'light' }: BridgeCardProps) {
                 ) : (
                   <>
                     {/* SWAP SELL */}
-                    <div className={`${inputBg} border rounded-2xl p-4 flex flex-col justify-between h-[120px] ${amountError ? 'border-red-500/60' : ''} transition-all duration-200`}>
+                    <div className={`${inputBg} border rounded-2xl p-3.5 sm:p-4 flex flex-col justify-between min-h-[110px] sm:min-h-[120px] ${amountError ? 'border-red-500/60' : ''} transition-all duration-200`}>
                       <div className="flex items-center justify-between">
                         <span className={`text-[11px] font-black ${textMuted} uppercase tracking-wider`}>Pay</span>
                         <div className="flex items-center gap-1.5">
@@ -805,7 +805,7 @@ export default function BridgeCard({ theme = 'light' }: BridgeCardProps) {
                     </div>
 
                     {/* SWAP BUY */}
-                    <div className={`${inputBg} border rounded-2xl p-4 flex flex-col justify-between h-[120px] transition-all duration-200`}>
+                    <div className={`${inputBg} border rounded-2xl p-3.5 sm:p-4 flex flex-col justify-between min-h-[110px] sm:min-h-[120px] transition-all duration-200`}>
                       <div className="flex items-center justify-between">
                         <span className={`text-[11px] font-black ${textMuted} uppercase tracking-wider`}>Receive</span>
                         <div className="flex items-center gap-1.5">
@@ -990,7 +990,7 @@ export default function BridgeCard({ theme = 'light' }: BridgeCardProps) {
                   type="button"
                   onClick={handleSwapSubmit}
                   disabled={!amount || parseFloat(amount) <= 0 || parseFloat(amount) > parseFloat(sellTokenBalance)}
-                  className={`w-full h-13 sm:h-14 rounded-2xl text-sm font-black uppercase tracking-wider transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer ${
+                  className={`w-full h-12 sm:h-14 rounded-2xl text-sm font-black uppercase tracking-wider transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer ${
                     !amount || parseFloat(amount) <= 0 || parseFloat(amount) > parseFloat(sellTokenBalance)
                       ? 'bg-slate-800/50 text-slate-500 border border-slate-800 cursor-not-allowed'
                       : 'bg-gradient-to-r from-[#C8922A] via-[#D4A043] to-[#E8A830] hover:brightness-110 text-white shadow-xl shadow-[#C8922A]/25'
