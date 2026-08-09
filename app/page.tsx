@@ -90,7 +90,7 @@ export default function Home() {
         setForcedTheme(t);
         setTheme(t);
       } else {
-        const savedTheme = localStorage.getItem('arcshift-theme');
+        const savedTheme = localStorage.getItem('bridgr-theme');
         if (savedTheme === 'light' || savedTheme === 'dark') {
           setTheme(savedTheme);
         }
@@ -111,7 +111,7 @@ export default function Home() {
   const handleToggleTheme = () => {
     const nextTheme = theme === 'dark' ? 'light' : 'dark';
     setTheme(nextTheme);
-    localStorage.setItem('arcshift-theme', nextTheme);
+    localStorage.setItem('bridgr-theme', nextTheme);
   };
 
   const isDark = theme === 'dark';

@@ -1,6 +1,6 @@
-# 🌌 ArcShift USDC Bridge: The Complete A-to-Z Technical Breakdown
+# 🌌 Bridgr USDC Bridge: The Complete A-to-Z Technical Breakdown
 
-Welcome to the comprehensive technical article for **ArcShift**, a premium, production-ready cross-chain USDC portal. ArcShift is engineered to support low-latency swaps across **23 EVM networks** leveraging Circle's **CCTP V2 (Cross-Chain Transfer Protocol)** infrastructure and **Arc Network** core relays.
+Welcome to the comprehensive technical article for **Bridgr**, a premium, production-ready cross-chain USDC portal. Bridgr is engineered to support low-latency swaps across **23 EVM networks** leveraging Circle's **CCTP V2 (Cross-Chain Transfer Protocol)** infrastructure and **Arc Network** core relays.
 
 This article details the architecture, technical workarounds for wallet compatibility, the database schema, RPC resilience layers, and the user interface design.
 
@@ -8,7 +8,7 @@ This article details the architecture, technical workarounds for wallet compatib
 
 ## 🗺️ 1. High-Level Architecture & CCTP V2 Workflow
 
-ArcShift is a non-custodial bridge. Rather than using traditional lock-and-mint pool mechanics, it uses Circle's official **CCTP (Burn-and-Mint)** model. This guarantees that bridged USDC is always native, eliminating the risk of wrapped token depegs.
+Bridgr is a non-custodial bridge. Rather than using traditional lock-and-mint pool mechanics, it uses Circle's official **CCTP (Burn-and-Mint)** model. This guarantees that bridged USDC is always native, eliminating the risk of wrapped token depegs.
 
 ```mermaid
 sequenceDiagram
@@ -39,8 +39,8 @@ On OP Stack networks (like **OP Sepolia**, **Unichain Sepolia**, and **Ink Sepol
 ### The Bug:
 When calling standard Wagmi `writeContract` functions, wallets like **OKX Wallet** invoke `eth_estimateGas` behind the scenes. Because of node-level estimation discrepancies on these specific rollups, the wallet returns `Network fee --` and disables the **Confirm** sign button, blocking the transaction.
 
-### The ArcShift Solution:
-ArcShift detects if the source or destination chain is an OP Stack rollup and injects custom parameters dynamically:
+### The Bridgr Solution:
+Bridgr detects if the source or destination chain is an OP Stack rollup and injects custom parameters dynamically:
 1. **Dynamic Gas Price Loading:** Queries the exact live gas price directly from the provider using `getGasPrice`.
 2. **Explicit Gas Limit Defs:** Replaces variable auto-estimation with a hardcoded buffer (e.g., `150,000` gas for approvals, `300,000` for burns, and `400,000` for mints).
 3. **Legacy Transaction Type Enforcement:** Passes `type: 'legacy'` to the write call, forcing the wallet to display the transaction fee as `Gas Limit * Gas Price` instantly without relying on internal `eth_estimateGas` simulations.
@@ -67,7 +67,7 @@ approveHash = await writeContract(config, {
 
 ## 💼 3. The Unified Portfolio Engine (Multi-RPC Fallback Layer)
 
-Checking token balances across 23 different testnet environments is slow and prone to rate limits. ArcShift implements a **Parallel Portfolio Loader** inside `components/bridge/UnifiedPortfolioDrawer.tsx`.
+Checking token balances across 23 different testnet environments is slow and prone to rate limits. Bridgr implements a **Parallel Portfolio Loader** inside `components/bridge/UnifiedPortfolioDrawer.tsx`.
 
 ### Parallel Batching:
 When the portfolio drawer is opened, it fires 23 concurrent HTTP `eth_call` requests using clean hex payload mapping for the ERC-20 `balanceOf(address)` method:
@@ -128,7 +128,7 @@ The bridge operates across these primary parameters:
 
 ## 🎨 6. User Interface Design System
 
-ArcShift features a modern, dark-mode design matching the **ArcID** ecosystem:
+Bridgr features a modern, dark-mode design matching the **ArcID** ecosystem:
 * **Backgrounds:** Slate dark (`#070B13`) with blurred gradient ambient blobs (`emerald-500/5` and `indigo-500/5`) to create visual depth.
 * **Panels:** Glassmorphic borders (`bg-[#0F172A]/40` with `backdrop-blur-xl` and `border-slate-800`).
 * **Animations:** Powered by `framer-motion` for drawer transitions, hover scale effects, and a custom scrolling ticker for the live activity feed.

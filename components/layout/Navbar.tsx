@@ -99,8 +99,8 @@ export default function Navbar({
           <div className="flex items-center gap-3 sm:gap-6">
             <a href="/" className="flex items-center cursor-pointer group">
               <img
-                src="https://i.ibb.co/x8BwmWJR/6ceb4b2f-4218-408d-b61a-c34d0f3f181e.png"
-                alt="ArcShift Logo"
+                src="/bridgr-logo-dark.svg"
+                alt="Bridgr Logo"
                 className="h-10 sm:h-12 w-auto object-contain transition-transform duration-300 group-hover:scale-105"
               />
             </a>

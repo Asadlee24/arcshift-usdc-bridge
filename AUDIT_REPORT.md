@@ -1,4 +1,4 @@
-# ArcShift USDC Bridge — Audit Report
+# Bridgr USDC Bridge — Audit Report
 
 **Date:** 2026-08-03
 **Scope:** Full codebase pass (app/, components/, constants/, hooks/, lib/, config)

@@ -1,4 +1,4 @@
-// app/analytics/page.tsx — ArcShift Analytics v6
+// app/analytics/page.tsx — Bridgr Analytics v6
 // Wallet copy, wallet history search, 24h/7d/30d filters, clean professional design
 
 'use client';
@@ -462,7 +462,7 @@ export default function AnalyticsPage() {
       t.amount, 'CCTP Auto-Relay', `"${t.user_address}"`, `"${t.burn_tx_hash || ''}"`,
     ].join(','));
     const blob = new Blob([['Time,From,To,USDC,Mode,Wallet,Burn Tx', ...rows].join('\n')], { type: 'text/csv' });
-    Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: `arcshift-${new Date().toISOString().slice(0, 10)}.csv` }).click();
+    Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: `bridgr-${new Date().toISOString().slice(0, 10)}.csv` }).click();
   };
 
   const onlineChains = SUPPORTED_CHAINS.filter(c => !c.isComingSoon && !c.isSolana && chainLatencies[c.id] !== -1 && chainLatencies[c.id] !== undefined).length;
@@ -507,7 +507,7 @@ export default function AnalyticsPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <a href="/" className="group shrink-0">
-              <img src="https://i.ibb.co/x8BwmWJR/6ceb4b2f-4218-408d-b61a-c34d0f3f181e.png" alt="ArcShift" className="h-9 w-auto object-contain group-hover:scale-105 transition-transform" />
+              <img src="/bridgr-logo-dark.svg" alt="Bridgr" className="h-9 w-auto object-contain group-hover:scale-105 transition-transform" />
             </a>
             <div className={`hidden sm:flex items-center gap-2 border-l ${C.divider} pl-3`}>
               <BarChart3 className="h-3.5 w-3.5" style={{ color: GOLD }} />
@@ -1085,11 +1085,11 @@ export default function AnalyticsPage() {
         {/* ── Footer ────────────────────────────────────────────────── */}
         <div className={`flex flex-col sm:flex-row items-center justify-between border-t ${C.divider} pt-6 gap-3`}>
           <p className={`text-[10px] font-semibold ${C.sub}`}>
-            ArcShift Bridge · Circle CCTP v2 Forwarding Service · {new Date().getFullYear()}
+            Bridgr Bridge · Circle CCTP v2 Forwarding Service · {new Date().getFullYear()}
           </p>
           <div className={`flex gap-5 text-[10px] font-bold ${C.sub}`}>
             <a href="https://x.com/asadleo416" target="_blank" rel="noreferrer" className="hover:text-amber-500 transition-colors">Twitter</a>
-            <a href="https://github.com/Asadlee24/arcshift-usdc-bridge" target="_blank" rel="noreferrer" className="hover:text-amber-500 transition-colors">GitHub</a>
+            <a href="https://github.com/Asadlee24/arcshift-usdc-bridge" target="_blank" rel="noreferrer" className="hover:text-amber-500 transition-colors">GitHub</a> {/* ⚠️ FLAG: update href when GitHub repo is renamed */}
             <a href="https://testnet.arcscan.app" target="_blank" rel="noreferrer" className="hover:text-amber-500 transition-colors">Arc Explorer</a>
           </div>
         </div>

@@ -1,5 +1,5 @@
 // components/layout/PromoSection.tsx
-// Redesigned Promo Section displaying key advantages matching ArcShift brand identity (Warm gold & teal accents)
+// Redesigned Promo Section displaying key advantages matching Bridgr brand identity (Warm gold & teal accents)
 
 'use client';
 

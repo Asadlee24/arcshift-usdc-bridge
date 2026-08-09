@@ -1,16 +1,16 @@
-# 🌌 ArcShift USDC Bridge: Next-Gen Cross-Chain Liquidity Layer
+# 🌌 Bridgr USDC Bridge: Next-Gen Cross-Chain Liquidity Layer
 
-Introducing **ArcShift**, the state-of-the-art cross-chain USDC portal built specifically for low-latency bridging across **23 EVM networks** leveraging Circle's **CCTP V2 (Cross-Chain Transfer Protocol)** architecture and **Arc Network** core relays.
+Introducing **Bridgr**, the state-of-the-art cross-chain USDC portal built specifically for low-latency bridging across **23 EVM networks** leveraging Circle's **CCTP V2 (Cross-Chain Transfer Protocol)** architecture and **Arc Network** core relays.
 
 ---
 
 ## 🚀 Key Innovations & Premium Features
 
 ### 1. 💼 Unified Portfolio Engine
-Forget jumping between multiple block explorers or adding dozens of networks manually just to check your balances. ArcShift aggregates all supported testnet balances in a sleek, glassmorphic slide-out drawer utilizing parallel RPC querying with bulletproof multi-node fallbacks.
+Forget jumping between multiple block explorers or adding dozens of networks manually just to check your balances. Bridgr aggregates all supported testnet balances in a sleek, glassmorphic slide-out drawer utilizing parallel RPC querying with bulletproof multi-node fallbacks.
 
 ### 2. ⚡ Bulletproof OKX Wallet Compatibility
-OP Stack testnets running outdated node engines frequently fail standard `eth_estimateGas` calls, disabling the "Confirm" button for OKX and other browser wallets. ArcShift solves this natively:
+OP Stack testnets running outdated node engines frequently fail standard `eth_estimateGas` calls, disabling the "Confirm" button for OKX and other browser wallets. Bridgr solves this natively:
 * **Dynamic Node Overrides:** Checks and prompts custom RPC endpoints when needed.
 * **Smart Gas Parameter Injection:** Fallback legacy (Type 0) parameter routing forces contract calls (Approve, Burn, Mint) to display correct network fees instantly.
 
@@ -45,7 +45,7 @@ sequenceDiagram
 
 ## 🔗 The 23 Supported Testnet Ecosystem
 
-ArcShift supports a massive matrix of EVM networks. Here is the full registry:
+Bridgr supports a massive matrix of EVM networks. Here is the full registry:
 
 | Chain Name | Chain ID | CCTP Domain | USDC Token Address | RPC Provider | Explorer |
 | :--- | :---: | :---: | :--- | :--- | :--- |
@@ -72,16 +72,16 @@ ArcShift supports a massive matrix of EVM networks. Here is the full registry:
 ## 📣 Ready-to-Post Promo Thread (for X / Twitter)
 
 ### Tweet 1 🧵
-> 🌌 Meet **ArcShift** — the premium cross-chain portal built for ultra-fast USDC bridging across 23 EVM networks! 🚀
+> 🌌 Meet **Bridgr** — the premium cross-chain portal built for ultra-fast USDC bridging across 23 EVM networks! 🚀
 > 
 > Leveraging Circle CCTP v2 infrastructure to bring instant, zero-slippage liquidity routing straight to testnet ecosystems.
 > 
-> Try it now: [arcshift-usdc-bridge.vercel.app](https://arcshift-usdc-bridge.vercel.app) 🔗
+> Try it now: [bridgr-usdc-bridge.vercel.app](https://bridgr-usdc-bridge.vercel.app) 🔗 *(⚠️ FLAG: update once Vercel domain is renamed)*
 
 ### Tweet 2 🧵
 > Tired of "Network fee --" or disabled "Confirm" buttons in your wallet on testnets? 🛠️
 > 
-> ArcShift dynamically overrides gas estimation pitfalls on OP Stack nodes (Optimism, Unichain, Ink Sepolia) using legacy transaction parameter injection. 
+> Bridgr dynamically overrides gas estimation pitfalls on OP Stack nodes (Optimism, Unichain, Ink Sepolia) using legacy transaction parameter injection. 
 > 
 > Seamless bridging in any wallet (including OKX)! 💼
 

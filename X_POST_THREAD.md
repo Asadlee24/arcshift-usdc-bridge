@@ -1,13 +1,13 @@
-# 🚀 ArcShift USDC Bridge — Major Product Update & V2 Release Thread
+# 🚀 Bridgr USDC Bridge — Major Product Update & V2 Release Thread
 
-Below is the complete, high-impact Twitter/X thread covering all of today's major upgrades, technical milestones, and UI enhancements for ArcShift.
+Below is the complete, high-impact Twitter/X thread covering all of today's major upgrades, technical milestones, and UI enhancements for Bridgr.
 
 ---
 
 ### 🧵 Tweet 1 (Hook / Announcement)
-🚀 **ArcShift V2 is LIVE!** 
+🚀 **Bridgr V2 is LIVE!** 
 
-We’ve completely overhauled the ArcShift Native USDC Bridge experience.
+We’ve completely overhauled the Bridgr Native USDC Bridge experience.
 
 ⚡ 100% Circle CCTP v2 Auto-Relay
 📊 Next-Gen Analytics Dashboard v6
@@ -65,11 +65,11 @@ A unified, high-end Web3 design language:
 ---
 
 ### 🧵 Tweet 6 (Closing & CTA)
-5/ 🌐 **Try ArcShift Today!**
+5/ 🌐 **Try Bridgr Today!**
 
 Experience true 1-signature native USDC cross-chain bridging across Ethereum Sepolia, Base, Arbitrum, Avalanche, Solana, Arc Testnet, and more.
 
-🔗 **Try it live**: https://arcshift-usdc-bridge.vercel.app
+🔗 **Try it live**: https://bridgr-usdc-bridge.vercel.app *(⚠️ FLAG: update once Vercel domain is renamed)*
 💬 **Feedback**: We’d love to hear your thoughts — drop a comment below or send us feedback directly on the app!
 
 #USDC #CCTP #Web3 #Crypto #DeFi #ArcNetwork #Ethereum #Solana #CrossChain #Blockchain

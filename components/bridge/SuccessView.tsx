@@ -57,8 +57,8 @@ export default function SuccessView({
 
   const handleCopy = () => {
     const receiptText = isSwap
-      ? `ArcShift Swap Receipt\n---------------------------\nAmount: ${amount}\nCompleted in ${elapsedSeconds} seconds\nTransaction Hash: ${sourceTxHash}\n---------------------------\nSwapped with ArcShift`
-      : `ArcShift Bridge Receipt\n---------------------------\nAmount: ${amount}\nRoute: ${fromChain?.name} → ${toChain?.name}\nMode: ${isAutoForwarded ? 'Circle Auto-Relay (1-Step)' : 'Manual Mint (2-Step)'}\nCompleted in ${elapsedSeconds} seconds\nSource Tx: ${sourceTxHash}\n---------------------------\nBridged with ArcShift`;
+      ? `Bridgr Swap Receipt\n---------------------------\nAmount: ${amount}\nCompleted in ${elapsedSeconds} seconds\nTransaction Hash: ${sourceTxHash}\n---------------------------\nSwapped with Bridgr`
+      : `Bridgr Bridge Receipt\n---------------------------\nAmount: ${amount}\nRoute: ${fromChain?.name} → ${toChain?.name}\nMode: ${isAutoForwarded ? 'Circle Auto-Relay (1-Step)' : 'Manual Mint (2-Step)'}\nCompleted in ${elapsedSeconds} seconds\nSource Tx: ${sourceTxHash}\n---------------------------\nBridged with Bridgr`;
     navigator.clipboard.writeText(receiptText);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -66,8 +66,8 @@ export default function SuccessView({
 
   const handleShareX = () => {
     const text = isSwap
-      ? `Just swapped ${amount} on Arc Testnet in ${elapsedSeconds} seconds using @ArcShift! 🚀\nTx: ${sourceTxHash}`
-      : `Just bridged ${amount} from ${fromChain?.name} to ${toChain?.name} in ${elapsedSeconds}s using @ArcShift! 🚀\n${isAutoForwarded ? '⚡ Circle 1-Step Auto-Relay' : '🔒 2-Step Mint'}\nSource Tx: ${sourceTxHash}`;
+      ? `Just swapped ${amount} on Arc Testnet in ${elapsedSeconds} seconds using @Bridgr! 🚀\nTx: ${sourceTxHash}`
+      : `Just bridged ${amount} from ${fromChain?.name} to ${toChain?.name} in ${elapsedSeconds}s using @Bridgr! 🚀\n${isAutoForwarded ? '⚡ Circle 1-Step Auto-Relay' : '🔒 2-Step Mint'}\nSource Tx: ${sourceTxHash}`;
     const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`;
     window.open(url, '_blank');
   };
@@ -155,7 +155,7 @@ export default function SuccessView({
             <span className={`text-[9px] uppercase tracking-widest font-black opacity-60 ${
               isDark ? 'text-slate-400' : 'text-slate-500'
             }`}>
-              {isSwap ? 'ArcShift Swap Receipt' : 'ArcShift Bridge Receipt'}
+              {isSwap ? 'Bridgr Swap Receipt' : 'Bridgr Bridge Receipt'}
             </span>
             <div className="text-xl font-black text-[#10B981] mt-0.5">
               {amount}

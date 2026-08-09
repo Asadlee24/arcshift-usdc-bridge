@@ -1,9 +1,9 @@
-# ArcShift Multi-Chain USDC Bridge
+# Bridgr Multi-Chain USDC Bridge
 
-ArcShift is a premium cross-chain bridge ecosystem built specifically for the **Arc Network**. Leveraging Circle's Cross-Chain Transfer Protocol (CCTP) and Circle AppKit, ArcShift enables seamless, secure, and native USDC bridging across **23 EVM testnet chains + Solana Devnet (24 total)** with real-time analytics, automated gasless execution, built-in transaction recovery tools, and an embeddable SDK widget.
+Bridgr is a premium cross-chain bridge ecosystem built specifically for the **Arc Network**. Leveraging Circle's Cross-Chain Transfer Protocol (CCTP) and Circle AppKit, Bridgr enables seamless, secure, and native USDC bridging across **23 EVM testnet chains + Solana Devnet (24 total)** with real-time analytics, automated gasless execution, built-in transaction recovery tools, and an embeddable SDK widget.
 
 ## 🚀 Live Demo & Deployment
-- **Deployment URL:** [arcshift-usdc-bridge.vercel.app](https://arcshift-usdc-bridge.vercel.app)
+- **Deployment URL:** [bridgr-usdc-bridge.vercel.app](https://bridgr-usdc-bridge.vercel.app) *(⚠️ FLAG: update once Vercel domain is renamed)*
 - **Vercel Preview Deployments:** Handled automatically on every push to the `main` branch.
 
 ---
@@ -27,7 +27,7 @@ ArcShift is a premium cross-chain bridge ecosystem built specifically for the **
 ## 💎 Premium Feature Index
 
 ### 1. Multi-Chain Registry & Connectivity (24 Networks Supported)
-ArcShift standardizes communication across 23 EVM testnets and Solana Devnet. Each chain is configured inside a centralized metadata registry (`constants/chains.ts`), acting as the single source of truth for the entire frontend and background scanning systems.
+Bridgr standardizes communication across 23 EVM testnets and Solana Devnet. Each chain is configured inside a centralized metadata registry (`constants/chains.ts`), acting as the single source of truth for the entire frontend and background scanning systems.
 
 #### Supported Chains & USDC Token Addresses:
 - **Arc Testnet** (Domain 26, Destination) - `0x3600000000000000000000000000000000000000`
@@ -57,7 +57,7 @@ ArcShift standardizes communication across 23 EVM testnets and Solana Devnet. Ea
 ---
 
 ### 2. Developer Widget SDK Portal & Embeddable Viewports
-- **Iframe Integration:** Allows external developers to embed the entire ArcShift bridge directly into their applications.
+- **Iframe Integration:** Allows external developers to embed the entire Bridgr bridge directly into their applications.
 - **Widget-Only Mode:** Supports special URL queries (`?widget=true`) to customize the viewport, hiding extra layout elements for a seamless embed.
 - **Dedicated Dev Portal:** An interactive Slide-over Drawer containing documentation, React code snippets, and iframe source configurations.
 - **Frame Embedding CSP Security:** Set up robust frame-ancestors CSP headers to prevent clickjacking while allowing verified integrations.

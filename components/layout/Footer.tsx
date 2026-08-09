@@ -37,7 +37,7 @@ export default function Footer({ theme = 'light' }: FooterProps) {
           {/* LEFT: Branding */}
           <div className="flex flex-col items-center md:items-start text-center md:text-left select-none">
             <span className={`text-[14px] font-extrabold ${brandText} tracking-tight`}>
-              ARCSHIFT
+              BRIDGR
             </span>
             <span className={`text-[11px] font-semibold ${descText} mt-0.5`}>
               Designed and built by{' '}
@@ -115,7 +115,7 @@ export default function Footer({ theme = 'light' }: FooterProps) {
         {/* Copyright */}
         <div className={`mt-6 pt-4 border-t ${copyrightBorder} text-center select-none`}>
           <span className={`text-[10px] font-bold ${copyrightText}`}>
-            2026 ArcShift. Powered by Circle and CCTP.
+            2026 Bridgr. Powered by Circle and CCTP.
           </span>
         </div>
       </div>

@@ -18,8 +18,8 @@ export interface BridgeTransaction {
   isRelayed?: boolean;
 }
 
-const LOCAL_STORAGE_KEY = 'arcshift-tx-history';
-const EVENT_NAME = 'arcshift-tx-history-updated';
+const LOCAL_STORAGE_KEY = 'bridgr-tx-history';
+const EVENT_NAME = 'bridgr-tx-history-updated';
 
 /**
  * Retrieves all transactions from localStorage

@@ -23,7 +23,7 @@ const isMuted = (): boolean => {
 export const toggleMuted = (): boolean => {
   if (typeof window === 'undefined') return true;
   const nextMuted = !isMuted();
-  localStorage.setItem('arcshift-muted', String(nextMuted));
+  localStorage.setItem('bridgr-muted', String(nextMuted));
   return nextMuted;
 };
 

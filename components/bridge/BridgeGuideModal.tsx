@@ -1,5 +1,5 @@
 // components/bridge/BridgeGuideModal.tsx
-// Ultra-sleek guide modal for ArcShift CCTP v2 Bridge — auto-relay & 1-signature workflow
+// Ultra-sleek guide modal for Bridgr CCTP v2 Bridge — auto-relay & 1-signature workflow
 
 'use client';
 

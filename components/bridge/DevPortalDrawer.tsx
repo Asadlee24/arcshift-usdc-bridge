@@ -1,5 +1,5 @@
 // components/bridge/DevPortalDrawer.tsx
-// A premium developer drawer allowing builders to customize, live preview, and copy embed code for the ArcShift USDC Bridge Widget
+// A premium developer drawer allowing builders to customize, live preview, and copy embed code for the Bridgr USDC Bridge Widget
 
 'use client';
 
@@ -19,7 +19,7 @@ export default function DevPortalDrawer({ isOpen, onClose, theme = 'light' }: De
   const [widgetTheme, setWidgetTheme] = useState<'dark' | 'light'>('dark');
   const [widgetChain, setWidgetChain] = useState<string>('ethereum');
   const [copied, setCopied] = useState(false);
-  const [origin, setOrigin] = useState('https://arcshift-bridge.vercel.app');
+  const [origin, setOrigin] = useState('https://bridgr-bridge.vercel.app'); // ⚠️ FLAG: update to new Vercel domain when assigned
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -97,7 +97,7 @@ export default function DevPortalDrawer({ isOpen, onClose, theme = 'light' }: De
                     Expand Your Platform
                   </div>
                   <p className={`text-[11px] font-semibold ${textMuted} leading-relaxed`}>
-                    Embed the ArcShift USDC Bridge directly into your dApp, NFT marketplace, game client, or portfolio. Enable players and users to bridge assets to Arc Network without leaving your site.
+                    Embed the Bridgr USDC Bridge directly into your dApp, NFT marketplace, game client, or portfolio. Enable players and users to bridge assets to Arc Network without leaving your site.
                   </p>
                 </div>
 
@@ -153,7 +153,7 @@ export default function DevPortalDrawer({ isOpen, onClose, theme = 'light' }: De
                     {/* Live iframe widget rendering */}
                     <iframe
                       src={widgetUrl}
-                      title="ArcShift Bridge Widget Preview"
+                      title="Bridgr Bridge Widget Preview"
                       className="w-full h-full border-none transform scale-[0.6] origin-center"
                       style={{ width: '166%', height: '166%' }} // Upscaled and scaled down to preview perfectly inside a smaller container
                     />
@@ -198,7 +198,7 @@ export default function DevPortalDrawer({ isOpen, onClose, theme = 'light' }: De
                   v1.0.0 Widget SDK
                 </span>
                 <a
-                  href="https://github.com/Asadlee24/arcshift-usdc-bridge"
+                  href="https://github.com/Asadlee24/arcshift-usdc-bridge" // ⚠️ FLAG: update href when GitHub repo is renamed
                   target="_blank"
                   rel="noopener noreferrer"
                   className="hover:text-[#10B981] flex items-center gap-0.5 transition-colors"

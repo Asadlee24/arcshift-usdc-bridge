@@ -317,7 +317,7 @@ export function useBridge() {
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('arcshift-bridging-status', {
+      window.dispatchEvent(new CustomEvent('bridgr-bridging-status', {
         detail: { isBridging: status === 'bridging' }
       }));
     }

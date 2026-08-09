@@ -243,7 +243,7 @@ export default function CircleOnRampModal({ isOpen, onClose, theme = 'light' }: 
 
             <p className={`text-[9px] font-semibold text-center mt-4 leading-relaxed
               ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>
-              Both links open external official Circle services. ArcShift does not process or store any financial or identity data.
+              Both links open external official Circle services. Bridgr does not process or store any financial or identity data.
             </p>
 
           </motion.div>

@@ -33,15 +33,15 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: 'ArcShift — Native USDC Bridge',
+  title: 'Bridgr — Native USDC Bridge',
   description: 'The fastest, native way to move USDC to Arc Network with subsecond finality. Powered by Circle CCTP.',
-  keywords: ['ArcShift', 'Arc Network', 'USDC Bridge', 'Circle CCTP', 'Crypto Bridge', 'Cross chain USDC', 'Defi', 'Asad Lee'],
+  keywords: ['Bridgr', 'Arc Network', 'USDC Bridge', 'Circle CCTP', 'Crypto Bridge', 'Cross chain USDC', 'Defi', 'Asad Lee'],
   authors: [{ name: 'Asad Lee', url: 'https://asad-lee-portfolio.vercel.app' }],
   openGraph: {
-    title: 'ArcShift — Native USDC Bridge',
+    title: 'Bridgr — Native USDC Bridge',
     description: 'Move USDC to Arc Network instantly with subsecond deterministic finality using official Circle CCTP.',
     type: 'website',
-    url: 'https://arcshift-usdc-bridge.vercel.app',
+    url: 'https://bridgr-usdc-bridge.vercel.app', // ⚠️ FLAG: update when new Vercel domain is assigned
   },
   icons: {
     icon: '/favicon.ico',

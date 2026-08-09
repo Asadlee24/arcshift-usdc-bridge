@@ -68,7 +68,7 @@ function transportFor(chainId: number): Transport {
 }
 
 export const config = getDefaultConfig({
-  appName: 'ArcShift',
+  appName: 'Bridgr',
   projectId,
   wallets: [
     {
