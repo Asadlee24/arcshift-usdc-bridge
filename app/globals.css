@@ -86,22 +86,22 @@
 }
 
 .dark {
-  --bg-page: #0B0A07;
-  --bg-card: #141209;
-  --bg-input-box: #0F0E0B;
-  --bg-sunken: #1A180F;
-  --border-card: rgba(200, 146, 42, 0.12);
-  --border-strong: rgba(200, 146, 42, 0.22);
+  --bg-page: #0A0A0A;
+  --bg-card: #141414;
+  --bg-input-box: #1A1915;
+  --bg-sunken: #1C1C1C;
+  --border-card: rgba(244, 217, 138, 0.20);
+  --border-strong: rgba(244, 217, 138, 0.35);
 
-  --text-primary: #F5F0E8;
-  --text-muted: #A09880;
-  --text-subtle: #6B6150;
+  --text-primary: #FAF7F0;
+  --text-muted: #D1C7B7;
+  --text-subtle: #A39785;
 
-  --accent-gold: #D4A043;
+  --accent-gold: #F4D98A;
   --accent-gold-hover: #C8922A;
-  --accent-gold-light: rgba(200, 146, 42, 0.15);
-  --accent-gold-ring: rgba(200, 146, 42, 0.40);
-  --accent-gold-glow: rgba(200, 146, 42, 0.35);
+  --accent-gold-light: rgba(244, 217, 138, 0.15);
+  --accent-gold-ring: rgba(244, 217, 138, 0.45);
+  --accent-gold-glow: rgba(200, 146, 42, 0.40);
 
   --accent-teal: #38BDF8;
   --accent-teal-mid: #0EA5E9;
@@ -125,14 +125,14 @@
  * Glassmorphism — two flavours, both tuned for the gold accent.
  * ============================================================ */
 .glass-panel-dark {
-  background: rgba(20, 18, 9, 0.82);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(200, 146, 42, 0.18);
+  background: rgba(20, 20, 20, 0.86);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(244, 217, 138, 0.25);
   box-shadow:
-    0 8px 32px 0 rgba(0, 0, 0, 0.45),
-    0 0 0 1px rgba(200, 146, 42, 0.08) inset,
-    0 0 40px 0 rgba(200, 146, 42, 0.06);
+    0 8px 32px 0 rgba(0, 0, 0, 0.65),
+    0 0 0 1px rgba(244, 217, 138, 0.12) inset,
+    0 0 45px 0 rgba(200, 146, 42, 0.12);
 }
 
 .glass-panel-light {
@@ -148,16 +148,22 @@
 /* Gold arc card glow */
 .glow-card-gold {
   box-shadow:
-    0 0 0 1px rgba(200, 146, 42, 0.15),
-    0 4px 16px -4px rgba(200, 146, 42, 0.20),
-    0 20px 48px -12px rgba(200, 146, 42, 0.12);
+    0 0 0 1px rgba(244, 217, 138, 0.25),
+    0 4px 20px -4px rgba(200, 146, 42, 0.35),
+    0 20px 50px -10px rgba(200, 146, 42, 0.20);
 }
 
 .glow-card-gold:hover {
   box-shadow:
-    0 0 0 1px rgba(200, 146, 42, 0.25),
-    0 4px 24px -4px rgba(200, 146, 42, 0.30),
-    0 20px 56px -12px rgba(200, 146, 42, 0.18);
+    0 0 0 1px rgba(244, 217, 138, 0.45),
+    0 6px 30px -4px rgba(200, 146, 42, 0.50),
+    0 25px 60px -10px rgba(200, 146, 42, 0.30);
+}
+
+.text-gold-gradient {
+  background: linear-gradient(135deg, #F4D98A 0%, #C8922A 50%, #A6741C 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 /* Kept for compat */

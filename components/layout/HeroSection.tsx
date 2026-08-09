@@ -62,7 +62,7 @@ export default function HeroSection({ theme = 'light' }: HeroSectionProps) {
           Bridge USDC Natively.
         </span>
         <span
-          className="block font-black bg-gradient-to-r from-[#C8922A] via-[#D4A043] to-[#E8A830] bg-clip-text text-transparent"
+          className="block font-black bg-gradient-to-r from-[#F4D98A] via-[#C8922A] to-[#A6741C] bg-clip-text text-transparent"
         >
           Subsecond & Automatic.
         </span>
