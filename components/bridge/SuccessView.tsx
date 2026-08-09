@@ -45,9 +45,7 @@ export default function SuccessView({
   const textPrimary = isDark ? 'text-white' : 'text-slate-900';
   const textMuted = isDark ? 'text-slate-400' : 'text-slate-500';
   
-  const buttonStyle = isDark 
-    ? 'bg-[#10B981] hover:bg-[#059669] text-[#070B13] shadow-[0_0_15px_rgba(16,185,129,0.3)]' 
-    : 'bg-[#10B981] hover:bg-[#059669] text-white shadow-[0_0_15px_rgba(16,185,129,0.2)]';
+  const buttonStyle = 'bg-gradient-to-r from-[#C8922A] via-[#D4A043] to-[#E8A830] hover:brightness-110 text-white shadow-xl shadow-[#C8922A]/25';
 
   const formatAddress = (addr: string) => {
     if (!addr) return '';
@@ -77,27 +75,27 @@ export default function SuccessView({
       
       {/* 1. Compact Header Row */}
       <div className="flex items-center gap-3 mb-3.5 mt-0.5 w-full">
-        <div className={`relative h-10 w-10 rounded-full border flex items-center justify-center shadow-[0_0_15px_rgba(16,185,129,0.25)] flex-shrink-0 ${
+        <div className={`relative h-10 w-10 rounded-full border flex items-center justify-center shadow-[0_0_15px_rgba(200,146,42,0.3)] flex-shrink-0 ${
           isDark 
-            ? 'bg-[#070B13] border-[#10B981] text-[#10B981]' 
-            : 'bg-emerald-50 border-[#10B981] text-[#059669]'
+            ? 'bg-[#0D1B2E] border-[#C8922A] text-[#C8922A]' 
+            : 'bg-amber-50 border-[#C8922A] text-[#C8922A]'
         }`}>
           <Check className="h-5 w-5 stroke-[3]" />
-          <div className="absolute inset-0 rounded-full bg-[#10B981]/25 blur-sm animate-pulse" />
+          <div className="absolute inset-0 rounded-full bg-[#C8922A]/25 blur-sm animate-pulse" />
         </div>
         
         <div className="flex-1 min-w-0">
           <h3 className={`text-base font-black ${textPrimary} tracking-tight uppercase leading-none mb-1 flex items-center gap-1.5`}>
             {isSwap ? 'SWAP COMPLETE' : 'BRIDGE COMPLETE'}
             {isAutoForwarded && !isSwap && (
-              <span className="text-[9px] font-black text-[#10B981] bg-[#10B981]/15 px-1.5 py-0.5 rounded border border-[#10B981]/30 flex items-center gap-0.5">
+              <span className="text-[9px] font-black text-[#C8922A] bg-[#C8922A]/15 px-1.5 py-0.5 rounded border border-[#C8922A]/30 flex items-center gap-0.5">
                 <Zap className="h-2.5 w-2.5" /> Auto-Relayed
               </span>
             )}
           </h3>
           <p className={`text-[11px] font-bold ${textMuted} truncate`}>
             {isSwap ? 'Successfully swapped ' : 'Successfully transferred '}
-            <span className="text-[#10B981] font-black">{amount}</span>
+            <span className="text-[#C8922A] font-black">{amount}</span>
           </p>
         </div>
       </div>
@@ -109,7 +107,7 @@ export default function SuccessView({
         <motion.div
           animate={{ x: [0, 160, 0] }}
           transition={{ duration: 3.5, repeat: Infinity, ease: 'easeInOut' }}
-          className="absolute top-1/2 left-[42px] -translate-y-1/2 h-2 w-2 rounded-full bg-[#10B981] shadow-[0_0_6px_#10B981] z-10"
+          className="absolute top-1/2 left-[42px] -translate-y-1/2 h-2 w-2 rounded-full bg-[#C8922A] shadow-[0_0_6px_#C8922A] z-10"
         />
 
         <div className="flex flex-col items-center gap-1 z-10">
@@ -121,15 +119,15 @@ export default function SuccessView({
           <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wider">{fromChain?.shortName}</span>
         </div>
 
-        <ArrowRight className="h-4 w-4 text-[#10B981] animate-pulse flex-shrink-0" />
+        <ArrowRight className="h-4 w-4 text-[#C8922A] animate-pulse flex-shrink-0" />
 
         <div className="flex flex-col items-center gap-1 z-10">
           <div className={`h-8 w-8 rounded-full p-0.5 flex items-center justify-center border-2 shadow-xs ${
-            isDark ? 'bg-[#0F172A] border-[#10B981]' : 'bg-white border-[#10B981]'
+            isDark ? 'bg-[#0F172A] border-[#C8922A]' : 'bg-white border-[#C8922A]'
           }`}>
             <img src={toChain?.iconUrl} alt={toChain?.name} className="h-full w-full rounded-full object-cover" />
           </div>
-          <span className="text-[8px] font-black text-[#10B981] uppercase tracking-wider">{toChain?.shortName}</span>
+          <span className="text-[8px] font-black text-[#C8922A] uppercase tracking-wider">{toChain?.shortName}</span>
         </div>
       </div>
 
@@ -137,7 +135,7 @@ export default function SuccessView({
       <div className="w-full mb-3.5 relative">
         <div className={`p-4 rounded-xl border border-dashed relative overflow-hidden font-mono text-left ${
           isDark 
-            ? 'bg-[#0F172A]/70 border-slate-800 text-slate-300' 
+            ? 'bg-[#0D1B2E]/90 border-slate-800 text-slate-300' 
             : 'bg-white border-slate-300 text-slate-700 shadow-sm'
         }`}>
           <div className="absolute top-0 left-0 right-0 h-1 flex justify-between overflow-hidden">
@@ -157,7 +155,7 @@ export default function SuccessView({
             }`}>
               {isSwap ? 'Bridgr Swap Receipt' : 'Bridgr Bridge Receipt'}
             </span>
-            <div className="text-xl font-black text-[#10B981] mt-0.5">
+            <div className="text-xl font-black text-[#C8922A] mt-0.5">
               {amount}
             </div>
           </div>
@@ -167,14 +165,14 @@ export default function SuccessView({
               <span className="opacity-60">Route:</span>
               <span className="font-bold flex items-center gap-1">
                 {fromChain?.shortName}
-                <ArrowRight className="h-2.5 w-2.5 text-[#10B981]" />
+                <ArrowRight className="h-2.5 w-2.5 text-[#C8922A]" />
                 {toChain?.shortName}
               </span>
             </div>
 
             <div className="flex justify-between">
               <span className="opacity-60">Mode:</span>
-              <span className="font-bold text-[#10B981]">
+              <span className="font-bold text-[#C8922A]">
                 {isAutoForwarded ? 'Circle 1-Step Auto-Relay' : '2-Step Manual Mint'}
               </span>
             </div>
@@ -190,7 +188,7 @@ export default function SuccessView({
                 href={fromChain?.explorerUrl ? `${fromChain.explorerUrl}/tx/${sourceTxHash}` : '#'}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="font-bold font-mono text-[#10B981] hover:underline flex items-center gap-0.5"
+                className="font-bold font-mono text-[#C8922A] hover:underline flex items-center gap-0.5"
               >
                 {formatAddress(sourceTxHash)}
                 <ExternalLink className="h-2.5 w-2.5" />
@@ -205,13 +203,13 @@ export default function SuccessView({
                     href={toChain?.explorerUrl ? `${toChain.explorerUrl}/tx/${destTxHash}` : '#'}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="font-bold font-mono text-[#10B981] hover:underline flex items-center gap-0.5"
+                    className="font-bold font-mono text-[#C8922A] hover:underline flex items-center gap-0.5"
                   >
                     {formatAddress(destTxHash)}
                     <ExternalLink className="h-2.5 w-2.5" />
                   </a>
                 ) : (
-                  <span className="font-bold font-mono text-[#10B981] flex items-center gap-1">
+                  <span className="font-bold font-mono text-[#C8922A] flex items-center gap-1">
                     <Zap className="h-3 w-3" /> Auto-Minted
                   </span>
                 )}
@@ -258,10 +256,10 @@ export default function SuccessView({
           }`}
         >
           {copied ? (
-            <span className="text-[#10B981]">Copied!</span>
+            <span className="text-[#C8922A]">Copied!</span>
           ) : (
             <>
-              <Copy className="w-3 h-3 text-[#10B981]" />
+              <Copy className="w-3 h-3 text-[#C8922A]" />
               Copy
             </>
           )}
@@ -277,7 +275,7 @@ export default function SuccessView({
               : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700 shadow-sm'
           }`}
         >
-          <ExternalLink className="w-3 h-3 text-[#10B981]" />
+          <ExternalLink className="w-3 h-3 text-[#C8922A]" />
           Explorer
         </a>
       </div>
@@ -285,7 +283,7 @@ export default function SuccessView({
       {/* 5. Reset / CTA Button */}
       <button
         onClick={onReset}
-        className={`w-full h-9.5 rounded-lg text-xs font-black uppercase tracking-wider transition-all duration-200 cursor-pointer ${buttonStyle}`}
+        className={`w-full h-11 sm:h-12 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-200 cursor-pointer ${buttonStyle}`}
       >
         {isSwap ? 'Swap again' : 'Bridge again'}
       </button>
