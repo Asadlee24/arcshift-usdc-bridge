@@ -39,6 +39,36 @@ export interface RpcEndpoint {
  * in sequence and stop at the first success.
  */
 export const CHAIN_RPCS: Record<number, RpcEndpoint[]> = {
+  // ─── MAINNET CANDIDATES ─────────────────────────────────────────
+  // Arc Mainnet (5042) — routed via /api/rpc proxy for browser CORS protection
+  5042: [
+    { url: 'https://rpc.mainnet.arc.io', corsBlocked: true },
+    { url: 'https://rpc.arc.io', corsBlocked: true },
+  ],
+
+  // Base Mainnet (8453)
+  8453: [
+    { url: 'https://mainnet.base.org' },
+    { url: 'https://base.llamarpc.com' },
+    { url: 'https://base-rpc.publicnode.com' },
+  ],
+
+  // Ethereum Mainnet (1)
+  1: [
+    { url: 'https://eth.llamarpc.com' },
+    { url: 'https://rpc.ankr.com/eth' },
+    { url: 'https://ethereum-rpc.publicnode.com' },
+    { url: 'https://cloudflare-eth.com' },
+  ],
+
+  // Arbitrum One (42161)
+  42161: [
+    { url: 'https://arb1.arbitrum.io/rpc' },
+    { url: 'https://arbitrum.llamarpc.com' },
+    { url: 'https://arbitrum-one-rpc.publicnode.com' },
+  ],
+
+  // ─── TESTNETS ───────────────────────────────────────────────────
   // Arc Testnet — no CORS on the only public endpoint, so it is proxy-only in the browser.
   5042002: [{ url: 'https://rpc.testnet.arc.network', corsBlocked: true }],
 

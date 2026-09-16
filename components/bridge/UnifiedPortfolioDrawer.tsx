@@ -119,15 +119,10 @@ export default function UnifiedPortfolioDrawer({ isOpen, onClose, theme = 'light
       const updatedStates = initialStates.map(state => {
         const found = results.find(r => r.chainId === state.chain.id);
         if (found) {
-          let adjustedBalance = found.balance;
-          if (state.chain.id === 5042002 && typeof window !== 'undefined' && address) {
-            const localOffset = parseFloat(localStorage.getItem(`arc_credit_USDC_${address}`) || '0');
-            adjustedBalance = Math.max(0, adjustedBalance + localOffset);
-          }
-          sum += adjustedBalance;
+          sum += found.balance;
           return {
             ...state,
-            balance: adjustedBalance,
+            balance: found.balance,
             isLoading: false,
             isError: found.error
           };

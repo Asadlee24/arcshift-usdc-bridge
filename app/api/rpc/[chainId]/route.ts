@@ -17,6 +17,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerRpcUrls, SOLANA_RPCS, SOLANA_PROXY_ID } from '../../../../lib/rpcEndpoints';
+import { ALLOWED_RPC_METHODS, isAllowedMethod } from '../../../../lib/rpcAllowlist';
 
 // Node runtime: some upstreams reject the edge runtime's fetch fingerprint.
 export const runtime = 'nodejs';
@@ -34,6 +35,9 @@ function resolveUpstreams(chainId: string): string[] {
   return Number.isFinite(numeric) ? getServerRpcUrls(numeric) : [];
 }
 
+const MAX_BODY_BYTES = 32 * 1024; // 32 KB
+const MAX_BATCH_SIZE = 10;
+
 export async function POST(
   request: NextRequest,
   context: { params: Promise<{ chainId: string }> }
@@ -48,15 +52,59 @@ export async function POST(
     );
   }
 
-  // Read the body once; it is replayed against each upstream on failover.
+  // Enforce request body size limit
+  const contentLength = request.headers.get('content-length');
+  if (contentLength && parseInt(contentLength, 10) > MAX_BODY_BYTES) {
+    return NextResponse.json(
+      { error: 'Payload exceeds maximum size limit (32KB)' },
+      { status: 413 }
+    );
+  }
+
   let body: string;
   try {
     body = await request.text();
+    if (body.length > MAX_BODY_BYTES) {
+      return NextResponse.json(
+        { error: 'Payload exceeds maximum size limit (32KB)' },
+        { status: 413 }
+      );
+    }
   } catch {
     return NextResponse.json({ error: 'Unable to read request body' }, { status: 400 });
   }
 
-  const failures: string[] = [];
+  // Validate JSON-RPC payload and method allowlist
+  try {
+    const parsed = JSON.parse(body);
+    if (Array.isArray(parsed)) {
+      if (parsed.length > MAX_BATCH_SIZE) {
+        return NextResponse.json(
+          { error: `Batch size exceeds limit of ${MAX_BATCH_SIZE}` },
+          { status: 400 }
+        );
+      }
+      for (const req of parsed) {
+        if (!isAllowedMethod(req?.method)) {
+          return NextResponse.json(
+            { error: `Method '${req?.method || 'unknown'}' is not permitted` },
+            { status: 403 }
+          );
+        }
+      }
+    } else if (typeof parsed === 'object' && parsed !== null) {
+      if (!isAllowedMethod(parsed.method)) {
+        return NextResponse.json(
+          { error: `Method '${parsed.method || 'unknown'}' is not permitted` },
+          { status: 403 }
+        );
+      }
+    } else {
+      return NextResponse.json({ error: 'Invalid JSON-RPC payload' }, { status: 400 });
+    }
+  } catch {
+    return NextResponse.json({ error: 'Malformed JSON payload' }, { status: 400 });
+  }
 
   for (const url of upstreams) {
     try {
@@ -69,15 +117,11 @@ export async function POST(
       });
 
       if (!upstreamResponse.ok) {
-        failures.push(`${url} -> HTTP ${upstreamResponse.status}`);
         continue;
       }
 
       const text = await upstreamResponse.text();
 
-      // A JSON-RPC error is a legitimate answer (e.g. "execution reverted"), so it is
-      // returned to the caller rather than triggering failover. Only transport-level
-      // failures fall through to the next upstream.
       return new NextResponse(text, {
         status: 200,
         headers: {
@@ -85,15 +129,15 @@ export async function POST(
           'Cache-Control': 'no-store',
         },
       });
-    } catch (error) {
-      failures.push(`${url} -> ${error instanceof Error ? error.message : String(error)}`);
+    } catch {
+      // Failover to next endpoint silently
     }
   }
 
+  // Sanitized error response without leaking upstream URLs or credentials
   return NextResponse.json(
     {
-      error: `All RPC endpoints failed for chain ${chainId}`,
-      attempts: failures,
+      error: `RPC request failed across all redundant endpoints for chain ${chainId}`,
     },
     { status: 502 }
   );

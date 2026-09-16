@@ -1,140 +1,115 @@
-# Bridgr Multi-Chain USDC Bridge
+# Bridgr: Arc Mainnet USDC Cross-Chain Bridge
 
-Bridgr is a premium cross-chain bridge ecosystem built specifically for the **Arc Network**. Leveraging Circle's Cross-Chain Transfer Protocol (CCTP) and Circle AppKit, Bridgr enables seamless, secure, and native USDC bridging across **23 EVM testnet chains + Solana Devnet (24 total)** with real-time analytics, automated gasless execution, built-in transaction recovery tools, and an embeddable SDK widget.
+![Bridgr Banner](https://i.ibb.co/x8BwmWJR/6ceb4b2f-4218-408d-b61a-c34d0f3f181e.png)
 
-## 🚀 Live Demo & Deployment
-- **Deployment URL:** [bridgr-usdc-bridge.vercel.app](https://bridgr-usdc-bridge.vercel.app) *(⚠️ FLAG: update once Vercel domain is renamed)*
-- **Vercel Preview Deployments:** Handled automatically on every push to the `main` branch.
+> **Built by Asad Lee**  
+> Cyber Security Researcher & Software Engineer  
+> Verification Wallet: `0x4427e7f84908285fba94193709c985849a785b05`  
+> Portfolio: [asad-lee-portfolio.vercel.app](https://asad-lee-portfolio.vercel.app) · X (Twitter): [@asadleo416](https://x.com/asadleo416)
 
----
+Bridgr is a high-performance cross-chain USDC bridge engineered specifically for the **Arc Network**. Leveraging Circle's **Cross-Chain Transfer Protocol (CCTP v2)**, Bridgr provides native, 1-signature auto-relayed USDC bridging between **Arc Mainnet** and premier EVM partner networks (**Base**, **Ethereum**, and **Arbitrum One**).
 
-## 🛠️ Tech Stack & Modular Architecture
-
-### Frontend & Visual System
-- **Next.js 16 (App Router):** Fast routing, server-rendered layouts, and performant assets.
-- **TypeScript:** Strict type safety across components, hooks, and contracts.
-- **Framer Motion & Lucide Icons:** Physics-based spring animations and scalable iconography.
-- **Three.js & React Three Fiber (R3F):** Immersive interactive 3D background grid.
-- **Vanilla CSS / Tailwind CSS v4:** Curated, responsive dark/light themed styling system.
-
-### Web3 Integration
-- **Wagmi v2 & Viem v2:** React hooks and utilities for wallet connection and state management.
-- **RainbowKit v2:** Premium wallet connection manager.
-- **Circle AppKit & CCTP SDK:** Official Cross-Chain Transfer Protocol integration enabling direct on-chain burn-and-mint flows.
+Bridgr eliminates wrapped-token vulnerabilities, liquidity pool slippage, and complex two-step claiming procedures by burning native USDC on the source network and auto-minting native USDC directly into the recipient's wallet on the destination network.
 
 ---
 
-## 💎 Premium Feature Index
+## 🚀 Key Highlights & Architecture
 
-### 1. Multi-Chain Registry & Connectivity (24 Networks Supported)
-Bridgr standardizes communication across 23 EVM testnets and Solana Devnet. Each chain is configured inside a centralized metadata registry (`constants/chains.ts`), acting as the single source of truth for the entire frontend and background scanning systems.
-
-#### Supported Chains & USDC Token Addresses:
-- **Arc Testnet** (Domain 26, Destination) - `0x3600000000000000000000000000000000000000`
-- **Ethereum Sepolia** (Domain 0) - `0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238`
-- **Avalanche Fuji** (Domain 1) - `0x5425890298aed601595a70AB815c96711a31Bc65`
-- **Optimism Sepolia** (Domain 2) - `0x5fd84259d66Cd46123540766Be93DFE6D43130D7`
-- **Arbitrum Sepolia** (Domain 3) - `0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d`
-- **Base Sepolia** (Domain 6) - `0x036CbD53842c5426634e7929541eC2318f3dCF7e`
-- **Polygon Amoy** (Domain 7) - `0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582`
-- **Unichain Sepolia** (Domain 10) - `0x31d0220469e10c4E71834a79b1f276d740d3768F`
-- **Linea Sepolia** (Domain 11) - `0xFEce4462D57bD51A6A552365A011b95f0E16d9B7`
-- **Sonic Testnet** (Domain 13) - `0x0BA304580ee7c9a980CF72e55f5Ed2E9fd30Bc51`
-- **World Chain Sepolia** (Domain 14) - `0x66145f38cBAC35Ca6F1Dfb4914dF98F1614aeA88`
-- **Monad Testnet** (Domain 15) - `0x534b2f3A21130d7a60830c2Df862319e593943A3`
-- **Sei Testnet** (Domain 16) - `0x4fCF1784B31630811181f670Aea7A7bEF803eaED`
-- **HyperEVM Testnet** (Domain 19) - `0x2B3370eE501B4a559b57D449569354196457D8Ab`
-- **Ink Sepolia** (Domain 21) - `0xFabab97dCE620294D2B0b0e46C68964e326300Ac`
-- **Pharos Atlantic Testnet** (Domain 31) - `0xcfc8330f4bcab529c625d12781b1c19466a9fc8b`
-- **Codex Testnet** (Domain 12) - `0x6d7f141b6819C2c9CC2f818e6ad549E7Ca090F8f`
-- **EDGE Testnet** (Domain 28) - `0x2d9F7CAD728051AA35Ecdc472a14cf8cDF5CFD6B`
-- **Injective Testnet** (Domain 29) - `0x0C382e685bbeeFE5d3d9C29e29E341fEE8E84C5d`
-- **Morph Holesky Testnet** (Domain 30) - `0xCfb1186F4e93D60E60a8bDd997427D1F33bc372B`
-- **Plume Testnet** (Domain 22) - `0xcB5f30e335672893c7eb944B374c196392C19D18`
-- **XDC Apothem** (Domain 18) - `0xb5AB69F7bBada22B28e79C8FFAECe55eF1c771D4`
-- **Solana Devnet** (Domain 5, **LIVE** — Non-EVM) - `4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU` ✅
+- **Arc Mainnet Native Integration:** Direct connectivity to Arc Mainnet (Chain ID `5042`, CCTP Domain `26`) and its native precompiled USDC interface.
+- **Circle CCTP v2 Protocol:** True burn-and-mint finality verified directly on-chain via Circle's `MessageTransmitterV2.usedNonces`.
+- **Single-Signature Auto-Relaying:** Senders sign once on the source network; native USDC is automatically minted on the destination chain without manual claims.
+- **Arc Native Gas Reservation:** Automatically accounts for Arc's dual gas token dynamics (native 18-decimal gas vs. 6-decimal precompile ERC-20) during `MAX` balance bridge calculations to prevent out-of-gas failures.
+- **Immediate Burn Persistence:** Saves transactions immediately upon wallet broadcast before block inclusion to guarantee funds are tracked even across browser crashes.
+- **Strict RPC Security Proxy:** Protects browser endpoints from CORS issues with strict JSON-RPC method allowlisting, 32 KB request limits, and upstream failover.
+- **Emergency Circuit Breaker:** Granular per-route and global pause controls (`NEXT_PUBLIC_PAUSE_ALL_TRANSFERS`) to halt new burns while preserving recovery flows.
 
 ---
 
-### 2. Developer Widget SDK Portal & Embeddable Viewports
-- **Iframe Integration:** Allows external developers to embed the entire Bridgr bridge directly into their applications.
-- **Widget-Only Mode:** Supports special URL queries (`?widget=true`) to customize the viewport, hiding extra layout elements for a seamless embed.
-- **Dedicated Dev Portal:** An interactive Slide-over Drawer containing documentation, React code snippets, and iframe source configurations.
-- **Frame Embedding CSP Security:** Set up robust frame-ancestors CSP headers to prevent clickjacking while allowing verified integrations.
+## 🏛️ Mainnet CCTP v2 Contract Matrix
+
+| Network | Chain ID | CCTP Domain | Native USDC (ERC-20) | TokenMessenger | MessageTransmitter |
+| :--- | :---: | :---: | :--- | :--- | :--- |
+| **Arc Mainnet** | `5042` | `26` | `0x3600000000000000000000000000000000000000` | `0x28b5a0e9C621a5BadaA536219b3a228C8168cf5d` | `0x81D40F21F12A8F0E3252Bccb954D722d4c464B64` |
+| **Base** | `8453` | `6` | `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` | `0x1682Ae6375C4E4A97e4B583BC394c861A46D8962` | `0xAD0978E57E4368944501a3F49c81729013FaB947` |
+| **Ethereum** | `1` | `0` | `0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48` | `0xbd3fa81b58ba92a82136038b25adec7066af3155` | `0x0a992d35273e3b790850ca14e0b68224741e7774` |
+| **Arbitrum One** | `42161` | `3` | `0xaf88d065e77c8cC2239327C5EDb3A432268e5831` | `0x19330d52D99E304216D853845416572e9a5957b7` | `0xC30362313FBBA5cf9163F0bb16a0e01f01A896ca` |
+
+*Note: Solana Mainnet is gated pending independent verification.*
 
 ---
 
-### 3. Unified Portfolio & USDC Balance Dashboard
-- **Total Portfolio Valuation:** Displays the total aggregated USDC balance across all supported testnets at the top of the Portfolio drawer.
-- **Chain-by-Chain Breakdown:** Features a clean, tabular dashboard detailing individual chain balances, network names, and quick-action links.
-- **Stale State Management:** Automatically resets manual state inputs and balances on network switches to avoid displaying stale data.
+## 🔬 Testnet CCTP v2 Contract Matrix
+
+When `NEXT_PUBLIC_APP_ENV=testnet` is enabled, Bridgr seamlessly routes to verified testnet counterparts:
+
+| Network | Chain ID | CCTP Domain | Native USDC (ERC-20) | TokenMessenger | MessageTransmitter |
+| :--- | :---: | :---: | :--- | :--- | :--- |
+| **Arc Testnet** | `5042002` | `26` | `0x3600000000000000000000000000000000000000` | `0x805206361a49B602eb6E719601d368e5feA9Efa0` | `0xE567634f1ffE0f3Be5eEF95A642c67E4254f15dC` |
+| **Base Sepolia** | `84532` | `6` | `0x036CbD53842c5426634e7929541eC2318f3dCF7e` | `0x9f3B8679c73C2Fef8b59B4f3444d4e156fb70AA5` | `0x7865fAfC2db2093669d92c0F33AeEF291086BEFD` |
+| **Ethereum Sepolia** | `11155111` | `0` | `0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238` | `0x9f3B8679c73C2Fef8b59B4f3444d4e156fb70AA5` | `0x7865fAfC2db2093669d92c0F33AeEF291086BEFD` |
+| **Arbitrum Sepolia** | `421614` | `3` | `0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d` | `0x9f3B8679c73C2Fef8b59B4f3444d4e156fb70AA5` | `0xaCF1ceeF35cfAC5613777235a90334f9748548b0` |
 
 ---
 
-### 4. Real-Time RPC Latency Monitor
-Pings all registered RPC URLs on chain picker dropdown open using `eth_blockNumber`.
-- **Latency badges:** Green (`<200ms`), Yellow (`200ms-500ms`), and Red (`>500ms`/offline) indicator dots next to each network.
+## 🛠️ Security & Architecture Standards
+
+### 1. Circle Iris MessageV2 Standards Compliance
+In Circle MessageV2, the cross-chain sequence nonce is formatted as a 32-byte field at byte offset 12 (hex index 24 to 87). Destination delivery is checked on `MessageTransmitterV2.usedNonces(bytes32 nonce)`. Bridgr verifies on-chain receipts rather than simulating delivery states.
+
+### 2. Arc Native Gas Dynamics
+On Arc Network, the native gas token is USDC denominated with 18 decimals, while the precompiled ERC-20 contract is 6 decimals. Bridgr's `calculateMaxBridgeAmount` reserves estimated gas in native units to prevent bridge transactions from reverting due to out-of-gas conditions.
+
+### 3. Server-Side RPC Proxy
+Arc RPC nodes reject client CORS preflight requests. Bridgr proxies calls through `POST /api/rpc/[chainId]`:
+- Restricts incoming methods to a strict read-only allowlist (`eth_call`, `eth_blockNumber`, `eth_getBalance`, `eth_getTransactionReceipt`, etc.).
+- Enforces a 32 KB payload limit and batch caps.
+- Automatically fails over across verified backup RPC nodes with latency tracking.
 
 ---
 
-### 5. Cyberpunk UI & Visual Feedback System
-- **Premium Cyberpunk Aesthetics:** Interactive 3D background grids, custom glowing cards, and micro-interactions.
-- **Step Tracker & Particle Simulator:** Renders step-by-step progress with sleek Web3 glowing animations and particle flights simulating cross-chain packet transfers.
-- **Theme-Aware Success View:** Success screen elements dynamically match dark and light themes, ensuring readability and visual brilliance.
+## 🧪 Automated Testing
 
----
+Bridgr includes automated regression tests covering protocol message parsing, gas reservation calculations, route fee quotes, lifecycle state machine transitions, and RPC proxy boundaries:
 
-### 6. Terminal-Style Shareable Bridge Receipt
-- **Dual-Hash Display:** Captures both the source chain burn hash and destination mint hash.
-- **Action Suite:** Built-in copy, share to X (Twitter), and open-in-explorer actions wrapped in a sleek, terminal-styled interface.
-
----
-
-### 7. Integrated Faucet Hub & Premium Guide Modal
-- **Faucet Hub:** Direct verified faucet links for all 23 EVM and non-EVM chains (including Morph, Monad, Sonic, Ink, Pharos, and Solana Devnet).
-- **Premium Guide Modal:** Redesigned into a grid layout showcasing visual steps on how CCTP operates.
-
----
-
-### 8. Gasless Relayer Mode
-Toggling Auto-Relay Service (Gasless Mode) ON:
-- Deducts a `$0.50 USDC` relayer subsidy fee from the transfer amount.
-- Sets destination gas tokens cost to `$0.00 (Gasless)`.
-- Relayer signs and mints automatically on the destination chain without prompts or wallet switches.
-
----
-
-### 9. Smart Gas & Approval Optimizations
-- **Allowance Pre-Check:** Scans existing token allowances to skip redundant token approval transactions, saving gas and time.
-- **Dynamic Decimals Resolver:** Dynamically fetches USDC token decimals on-chain to handle custom decimals formatting on MetaMask safely.
-
----
-
-### 10. CORS Proxy & Multi-Node Fallback Infrastructure
-- **Serverless RPC Proxy:** Next.js `/api/rpc/[chainId]` endpoint proxies RPC requests server-side, bypassing browser CORS restrictions for chains with missing CORS headers (e.g. Arc Testnet).
-- **Latency-Ranked Fallbacks:** Automatically ranks multi-node endpoints by latency every 30s and falls back if a primary node hangs or fails.
-
----
-
-## 💻 Local Development
-
-Create a `.env.local` file:
-```env
-NEXT_PUBLIC_WC_PROJECT_ID=148d42d3d9e29a8a706509f6df849a78
-NEXT_PUBLIC_ARC_RPC=https://rpc.testnet.arc.network
+```bash
+# Run automated tests using Node 24 native test runner
+npm test
 ```
 
-Install packages and run:
+Test coverage:
+- `test/cctp_message.test.ts`: CCTP v2 32-byte nonce offset, BurnMessage decoding, bytes32 address conversion.
+- `test/bridge_quotes.test.ts`: Dynamic Iris fees, strict numeric input validation, 6-decimal BigInt precision, Arc native gas reservation.
+- `test/state_machine.test.ts`: Lifecycle state transitions, pre-burn terminal guards, post-burn recovery guarantees.
+- `test/rpc_proxy.test.ts`: Strict JSON-RPC method allowlist and rejection of unauthorized methods.
+
+---
+
+## 💻 Local Development & Deployment
+
+### 1. Environment Configuration
+Copy the template file:
+```bash
+cp .env.example .env.local
+```
+Configure your Reown / WalletConnect Cloud project ID and Supabase credentials.
+
+### 2. Installation & Run
 ```bash
 npm install --legacy-peer-deps
 npm run dev
 ```
 
+### 3. Canary Live Transfer Runbook
+Before executing real-value transfers on Arc Mainnet, follow the step-by-step small-value canary procedure documented in:
+[docs/CANARY_RUNBOOK.md](docs/CANARY_RUNBOOK.md).
+
 ---
 
-## 👤 Developer Profile
-- **Developer:** Asad Lee (IMSciences Student, Cyber Security Researcher)
-- **Portfolio:** [asad-lee-portfolio.vercel.app](https://asad-lee-portfolio.vercel.app)
-- **X (Twitter):** [@asadleo416](https://x.com/asadleo416)
-- **LinkedIn:** Asad Ali Ali
-- **Verification Wallet Address:** `0x4427e7f84908285fba94193709c985849a785b05`
+## 👤 Credits & Author
+
+**Built with pride by Asad Lee**  
+- **Profile:** Cyber Security Researcher & Software Engineer  
+- **Verification Wallet:** `0x4427e7f84908285fba94193709c985849a785b05`  
+- **Portfolio:** [asad-lee-portfolio.vercel.app](https://asad-lee-portfolio.vercel.app)  
+- **X (Twitter):** [@asadleo416](https://x.com/asadleo416)  
+- **LinkedIn:** [Asad Ali Ali](https://linkedin.com/in/asad-ali-ali)  

@@ -15,6 +15,7 @@ import {
 import { getAllTxsFromSupabase, SupabaseTx } from '../../lib/supabase';
 import { getChainById, SUPPORTED_CHAINS } from '../../constants/chains';
 import { measureChainLatency } from '../../lib/rpcClient';
+import { getActiveEnvironment } from '../../lib/registry';
 
 // ─────────────────────────────────────────────────────────────
 // Utility helpers
@@ -324,23 +325,34 @@ export default function AnalyticsPage() {
     });
   }, []);
 
+  // Filter out any non-bridge or simulated swap entries
+  const validBridgeTxs = useMemo(() => {
+    return allTxs.filter(t => {
+      if (!t.amount) return false;
+      if (t.amount.includes('→') || t.amount.includes('swap') || isNaN(parseFloat(t.amount))) {
+        return false;
+      }
+      return true;
+    });
+  }, [allTxs]);
+
   // Timeframe filter
   const successTxs = useMemo(() => {
     const now = Date.now();
     const spans: Record<string, number> = { '24h': 86_400_000, '7d': 7 * 86_400_000, '30d': 30 * 86_400_000 };
-    return allTxs.filter(t => {
+    return validBridgeTxs.filter(t => {
       if (t.status !== 'success') return false;
       if (timeframe === 'all') return true;
       return now - new Date(t.timestamp).getTime() <= spans[timeframe];
     });
-  }, [allTxs, timeframe]);
+  }, [validBridgeTxs, timeframe]);
 
   // Stats
   const stats = useMemo(() => {
     const totalCount = successTxs.length;
-    const pending = allTxs.filter(t => t.status === 'pending').length;
-    const failed = allTxs.filter(t => t.status === 'failed').length;
-    const successRate = allTxs.length > 0 ? (totalCount / allTxs.length) * 100 : 0;
+    const pending = validBridgeTxs.filter(t => t.status === 'pending').length;
+    const failed = validBridgeTxs.filter(t => t.status === 'failed').length;
+    const successRate = validBridgeTxs.length > 0 ? (totalCount / validBridgeTxs.length) * 100 : 0;
     const amounts = successTxs.map(t => parseFloat(t.amount || '0'));
     const totalVolume = amounts.reduce((a, b) => a + b, 0);
     const avgTx = totalCount > 0 ? totalVolume / totalCount : 0;
@@ -546,6 +558,28 @@ export default function AnalyticsPage() {
               Bridge Now
             </a>
           </div>
+        </div>
+      </div>
+
+      {/* ── CCTP v2 Coverage Disclosure Banner ──────────────────── */}
+      <div className={`border-b py-2.5 px-4 sm:px-6 ${dark ? 'bg-slate-900/40 border-slate-800/60 text-slate-400' : 'bg-amber-50/50 border-amber-200/60 text-slate-600'}`}>
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-[11px] font-medium">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="h-4 w-4 text-[#C8922A] shrink-0" />
+            <span>
+              <strong>CCTP v2 Protocol Coverage:</strong> Displaying audited cross-chain USDC transfer metrics for{' '}
+              <strong className={dark ? 'text-white' : 'text-slate-900'}>
+                {getActiveEnvironment() === 'mainnet' ? 'Arc Mainnet & Partner EVMs' : 'Testnet'}
+              </strong>. Simulated test data and non-CCTP swaps are segregated.
+            </span>
+          </div>
+          <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full border shrink-0 ${
+            getActiveEnvironment() === 'mainnet'
+              ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+              : 'bg-amber-500/10 border-amber-500/20 text-amber-400'
+          }`}>
+            {getActiveEnvironment() === 'mainnet' ? 'Mainnet Live' : 'Testnet Mode'}
+          </span>
         </div>
       </div>
 

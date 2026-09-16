@@ -1,14 +1,15 @@
 // lib/supabase.ts
-// Lightweight HTTP-based client for querying and storing transaction records on Supabase.
+// Lightweight HTTP-based client for querying and storing transaction records on Supabase
+// with strict environment isolation, verification status, and case-sensitive address handling.
+
+import { getActiveEnvironment } from './registry/index.ts';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
 if (typeof window !== 'undefined') {
   if (!SUPABASE_URL || !SUPABASE_KEY) {
-    console.warn('⚠️ Supabase environment variables are MISSING! Ensure you redeployed your Vercel project after adding them.');
-  } else {
-    console.log('✅ Supabase initialized successfully for project URL:', SUPABASE_URL);
+    console.warn('⚠️ Supabase environment variables are missing. Transaction analytics will run in local-only mode.');
   }
 }
 
@@ -22,10 +23,29 @@ export interface SupabaseTx {
   burn_tx_hash?: string;
   mint_tx_hash?: string;
   timestamp: number;
+  environment?: 'mainnet' | 'testnet';
+  verification_status?: 'pending_reconciliation' | 'verified_onchain' | 'failed';
+}
+
+/**
+ * Normalizes user address: lowercase for 0x EVM hex addresses;
+ * preserves exact casing for Solana base58 addresses.
+ */
+export function normalizeWalletAddress(address: string): string {
+  if (!address) return '';
+  const trimmed = address.trim();
+  if (trimmed.startsWith('0x') || trimmed.startsWith('0X')) {
+    return trimmed.toLowerCase();
+  }
+  // Base58 Solana address is case-sensitive
+  return trimmed;
 }
 
 export async function saveTxToSupabase(tx: SupabaseTx): Promise<boolean> {
   if (!SUPABASE_URL || !SUPABASE_KEY) return false;
+
+  const env = tx.environment || getActiveEnvironment();
+  const normalizedAddress = normalizeWalletAddress(tx.user_address);
 
   try {
     const response = await fetch(`${SUPABASE_URL}/rest/v1/bridge_transactions`, {
@@ -38,22 +58,22 @@ export async function saveTxToSupabase(tx: SupabaseTx): Promise<boolean> {
       },
       body: JSON.stringify({
         id: tx.id,
-        user_address: tx.user_address.toLowerCase(),
+        user_address: normalizedAddress,
         from_chain_id: tx.from_chain_id,
         to_chain_id: tx.to_chain_id,
         amount: tx.amount,
         status: tx.status,
         burn_tx_hash: tx.burn_tx_hash || tx.id,
         mint_tx_hash: tx.mint_tx_hash || null,
-        timestamp: tx.timestamp
+        timestamp: tx.timestamp,
+        environment: env,
+        verification_status: tx.verification_status || 'pending_reconciliation'
       })
     });
-    
+
     if (!response.ok) {
       const errText = await response.text();
       console.warn('⚠️ Supabase saveTx failed:', response.status, errText);
-    } else {
-      console.log('✅ Supabase saveTx success');
     }
     return response.ok;
   } catch (e) {
@@ -65,11 +85,11 @@ export async function saveTxToSupabase(tx: SupabaseTx): Promise<boolean> {
 export async function updateTxInSupabase(id: string, updateData: Partial<SupabaseTx>): Promise<boolean> {
   if (!SUPABASE_URL || !SUPABASE_KEY) return false;
 
-  // Format keys from camelCase to snake_case if any passed
-  const formattedUpdate: any = {};
+  const formattedUpdate: Record<string, unknown> = {};
   if (updateData.status) formattedUpdate.status = updateData.status;
   if (updateData.mint_tx_hash) formattedUpdate.mint_tx_hash = updateData.mint_tx_hash;
   if (updateData.burn_tx_hash) formattedUpdate.burn_tx_hash = updateData.burn_tx_hash;
+  if (updateData.verification_status) formattedUpdate.verification_status = updateData.verification_status;
 
   try {
     const response = await fetch(`${SUPABASE_URL}/rest/v1/bridge_transactions?id=eq.${id}`, {
@@ -81,13 +101,7 @@ export async function updateTxInSupabase(id: string, updateData: Partial<Supabas
       },
       body: JSON.stringify(formattedUpdate)
     });
-    
-    if (!response.ok) {
-      const errText = await response.text();
-      console.warn('⚠️ Supabase updateTx failed:', response.status, errText);
-    } else {
-      console.log('✅ Supabase updateTx success');
-    }
+
     return response.ok;
   } catch (e) {
     console.error('Supabase transaction update failed:', e);
@@ -95,24 +109,26 @@ export async function updateTxInSupabase(id: string, updateData: Partial<Supabas
   }
 }
 
-export async function getTxsFromSupabase(walletAddress: string): Promise<SupabaseTx[]> {
+export async function getTxsFromSupabase(walletAddress: string, env?: 'mainnet' | 'testnet'): Promise<SupabaseTx[]> {
   if (!SUPABASE_URL || !SUPABASE_KEY || !walletAddress) return [];
 
+  const targetEnv = env || getActiveEnvironment();
+  const normalized = normalizeWalletAddress(walletAddress);
+
   try {
-    const response = await fetch(`${SUPABASE_URL}/rest/v1/bridge_transactions?user_address=eq.${walletAddress.toLowerCase()}&order=timestamp.desc`, {
-      method: 'GET',
-      headers: {
-        'apikey': SUPABASE_KEY,
-        'Authorization': `Bearer ${SUPABASE_KEY}`
+    const response = await fetch(
+      `${SUPABASE_URL}/rest/v1/bridge_transactions?user_address=eq.${normalized}&environment=eq.${targetEnv}&order=timestamp.desc`,
+      {
+        method: 'GET',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`
+        }
       }
-    });
+    );
     if (response.ok) {
       const data = await response.json();
-      console.log('✅ Supabase getTxs loaded rows:', data.length);
       return Array.isArray(data) ? data : [];
-    } else {
-      const errText = await response.text();
-      console.warn('⚠️ Supabase getTxs failed:', response.status, errText);
     }
   } catch (e) {
     console.error('Supabase transactions fetch failed:', e);
@@ -120,11 +136,14 @@ export async function getTxsFromSupabase(walletAddress: string): Promise<Supabas
   return [];
 }
 
-export async function getAllTxsFromSupabase(): Promise<SupabaseTx[]> {
+export async function getAllTxsFromSupabase(env?: 'mainnet' | 'testnet'): Promise<SupabaseTx[]> {
   if (!SUPABASE_URL || !SUPABASE_KEY) return [];
+
+  const targetEnv = env || getActiveEnvironment();
+
   try {
     const response = await fetch(
-      `${SUPABASE_URL}/rest/v1/bridge_transactions?order=timestamp.desc&limit=500`,
+      `${SUPABASE_URL}/rest/v1/bridge_transactions?environment=eq.${targetEnv}&order=timestamp.desc&limit=500`,
       {
         method: 'GET',
         headers: {

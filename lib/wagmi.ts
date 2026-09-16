@@ -12,6 +12,9 @@ import {
   phantomWallet,
 } from '@rainbow-me/rainbowkit/wallets';
 import {
+  mainnet,
+  base,
+  arbitrum,
   sepolia,
   baseSepolia,
   arbitrumSepolia,
@@ -21,7 +24,7 @@ import {
   polygonAmoy,
 } from 'wagmi/chains';
 import { type Transport } from 'wagmi';
-import { arcTestnet } from './arcChain';
+import { arcMainnet, arcTestnet } from './arcChain';
 import {
   unichainSepolia,
   sonicTestnet,
@@ -81,7 +84,12 @@ export const config = getDefaultConfig({
     },
   ],
   chains: [
-    // ── Core chains (original) ─────────────────────────
+    // ── Candidate Mainnet Chains ───────────────────────
+    arcMainnet,
+    base,
+    mainnet,
+    arbitrum,
+    // ── Testnet chains ─────────────────────────────────
     arcTestnet,
     sepolia,
     baseSepolia,
@@ -90,7 +98,7 @@ export const config = getDefaultConfig({
     optimismSepolia,
     lineaSepolia,
     polygonAmoy,
-    // ── New chains from Arc BridgeChain enum ───────────
+    // ── Other testnet chains ───────────────────────────
     unichainSepolia,
     sonicTestnet,
     hyperEvmTestnet,
@@ -107,6 +115,10 @@ export const config = getDefaultConfig({
     xdcApothem,
   ],
   transports: {
+    [arcMainnet.id]: transportFor(arcMainnet.id),
+    [base.id]: transportFor(base.id),
+    [mainnet.id]: transportFor(mainnet.id),
+    [arbitrum.id]: transportFor(arbitrum.id),
     [arcTestnet.id]: transportFor(arcTestnet.id),
     [sepolia.id]: transportFor(sepolia.id),
     [baseSepolia.id]: transportFor(baseSepolia.id),

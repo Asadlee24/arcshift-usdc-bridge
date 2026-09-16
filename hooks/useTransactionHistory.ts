@@ -1,9 +1,11 @@
 // hooks/useTransactionHistory.ts
 // Robust custom hook for managing bridge transaction history in localStorage and syncing with Supabase in the background
+// Isolates mainnet and testnet history, quarantines simulated swap strings, and records nonces.
 
 import { useState, useEffect, useCallback } from 'react';
 import { useAccount } from 'wagmi';
 import { saveTxToSupabase, updateTxInSupabase, getTxsFromSupabase } from '../lib/supabase';
+import { getActiveEnvironment } from '../lib/registry';
 
 export interface BridgeTransaction {
   id: string; // Typically the burn transaction hash
@@ -15,20 +17,38 @@ export interface BridgeTransaction {
   status: 'pending' | 'success' | 'failed';
   burnTxHash?: string;
   mintTxHash?: string;
+  nonce?: string;
   isRelayed?: boolean;
+  environment?: 'mainnet' | 'testnet';
+  errorReason?: string;
 }
 
-const LOCAL_STORAGE_KEY = 'bridgr-tx-history';
+function getStorageKey(): string {
+  const env = getActiveEnvironment();
+  return env === 'mainnet' ? 'bridgr-tx-history-mainnet' : 'bridgr-tx-history-testnet';
+}
+
 const EVENT_NAME = 'bridgr-tx-history-updated';
 
 /**
- * Retrieves all transactions from localStorage
+ * Retrieves all valid bridge transactions from localStorage, filtering out legacy simulated swaps.
  */
 export function getTransactionHistory(): BridgeTransaction[] {
   if (typeof window === 'undefined') return [];
   try {
-    const data = localStorage.getItem(LOCAL_STORAGE_KEY);
-    return data ? JSON.parse(data) : [];
+    const key = getStorageKey();
+    const data = localStorage.getItem(key);
+    if (!data) return [];
+    const parsed = JSON.parse(data);
+    if (!Array.isArray(parsed)) return [];
+
+    // Quarantine legacy simulated swap entries
+    return parsed.filter((tx: BridgeTransaction) => {
+      if (typeof tx.amount === 'string' && tx.amount.includes('→')) {
+        return false;
+      }
+      return true;
+    });
   } catch (e) {
     console.error('Error reading transaction history from localStorage:', e);
     return [];
@@ -41,7 +61,8 @@ export function getTransactionHistory(): BridgeTransaction[] {
 export function saveTransactionHistory(txs: BridgeTransaction[]) {
   if (typeof window === 'undefined') return;
   try {
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(txs));
+    const key = getStorageKey();
+    localStorage.setItem(key, JSON.stringify(txs));
     window.dispatchEvent(new Event(EVENT_NAME));
   } catch (e) {
     console.error('Error saving transaction history to localStorage:', e);
@@ -59,6 +80,7 @@ export function addTransaction(tx: Omit<BridgeTransaction, 'timestamp'>) {
   }
   const newTx: BridgeTransaction = {
     ...tx,
+    environment: getActiveEnvironment(),
     timestamp: Date.now()
   };
   const updated = [newTx, ...txs];
@@ -108,103 +130,109 @@ export function updateTransaction(
  * Clears transaction history for a specific wallet address
  */
 export function clearTransactionHistory(userAddress?: string) {
+  if (typeof window === 'undefined') return;
   if (!userAddress) {
     saveTransactionHistory([]);
     return;
   }
   const txs = getTransactionHistory();
-  const updated = txs.filter(tx => tx.userAddress.toLowerCase() !== userAddress.toLowerCase());
-  saveTransactionHistory(updated);
+  const filtered = txs.filter(t => t.userAddress.toLowerCase() !== userAddress.toLowerCase());
+  saveTransactionHistory(filtered);
 }
 
 /**
- * Custom React hook for component consumption
+ * React hook to listen to transaction updates and auto-sync with Supabase
  */
 export function useTransactionHistory() {
   const { address } = useAccount();
   const [history, setHistory] = useState<BridgeTransaction[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  const loadHistory = useCallback(() => {
-    if (!address) {
-      setHistory([]);
-      return;
+  const loadHistory = useCallback(async () => {
+    setIsLoading(true);
+    // Load local history first for immediate render
+    const localTxs = getTransactionHistory();
+    const filteredLocal = address
+      ? localTxs.filter(t => t.userAddress.toLowerCase() === address.toLowerCase())
+      : localTxs;
+
+    setHistory(filteredLocal);
+    setIsLoading(false);
+
+    // Reconcile with Supabase in background
+    if (address) {
+      try {
+        const cloudTxs = await getTxsFromSupabase(address);
+        if (cloudTxs && cloudTxs.length > 0) {
+          const currentLocal = getTransactionHistory();
+          let changed = false;
+          const merged = [...currentLocal];
+
+          cloudTxs.forEach(ctx => {
+            const existingIndex = merged.findIndex(m => m.id === ctx.id);
+            if (existingIndex === -1) {
+              merged.push({
+                id: ctx.id,
+                timestamp: ctx.timestamp,
+                userAddress: ctx.user_address,
+                fromChainId: ctx.from_chain_id,
+                toChainId: ctx.to_chain_id,
+                amount: ctx.amount,
+                status: ctx.status,
+                burnTxHash: ctx.burn_tx_hash || ctx.id,
+                mintTxHash: ctx.mint_tx_hash || undefined
+              });
+              changed = true;
+            } else {
+              const existing = merged[existingIndex];
+              if (existing.status !== ctx.status || existing.mintTxHash !== ctx.mint_tx_hash) {
+                merged[existingIndex] = {
+                  ...existing,
+                  status: ctx.status,
+                  mintTxHash: ctx.mint_tx_hash || existing.mintTxHash,
+                };
+                changed = true;
+              }
+            }
+          });
+
+          if (changed) {
+            saveTransactionHistory(merged);
+            const refiltered = merged.filter(t => t.userAddress.toLowerCase() === address.toLowerCase());
+            setHistory(refiltered);
+          }
+        }
+      } catch (err) {
+        console.warn('Background Supabase reconciliation skipped:', err);
+      }
     }
-    const allTxs = getTransactionHistory();
-    const filtered = allTxs.filter(tx => tx.userAddress.toLowerCase() === address.toLowerCase());
-    setHistory(filtered);
   }, [address]);
 
   useEffect(() => {
     loadHistory();
 
     const handleUpdate = () => {
-      loadHistory();
+      const localTxs = getTransactionHistory();
+      const filtered = address
+        ? localTxs.filter(t => t.userAddress.toLowerCase() === address.toLowerCase())
+        : localTxs;
+      setHistory(filtered);
     };
 
     window.addEventListener(EVENT_NAME, handleUpdate);
-
-    // Background sync from Supabase
-    if (address) {
-      getTxsFromSupabase(address)
-        .then(cloudTxs => {
-          if (!cloudTxs || cloudTxs.length === 0) return;
-
-          const localTxs = getTransactionHistory();
-          let mergedHasChanged = false;
-
-          // Map local items by ID for O(1) checks
-          const localMap = new Map(localTxs.map(t => [t.id, t]));
-
-          cloudTxs.forEach(ctx => {
-            const mappedCtx: BridgeTransaction = {
-              id: ctx.id,
-              timestamp: ctx.timestamp,
-              userAddress: ctx.user_address,
-              fromChainId: ctx.from_chain_id,
-              toChainId: ctx.to_chain_id,
-              amount: ctx.amount,
-              status: ctx.status,
-              burnTxHash: ctx.burn_tx_hash,
-              mintTxHash: ctx.mint_tx_hash || undefined
-            };
-
-            const existing = localMap.get(ctx.id);
-            if (!existing) {
-              localMap.set(ctx.id, mappedCtx);
-              mergedHasChanged = true;
-            } else {
-              if (existing.status !== ctx.status || existing.mintTxHash !== ctx.mint_tx_hash) {
-                localMap.set(ctx.id, {
-                  ...existing,
-                  status: ctx.status,
-                  mintTxHash: ctx.mint_tx_hash || existing.mintTxHash,
-                  burnTxHash: ctx.burn_tx_hash || existing.burnTxHash
-                });
-                mergedHasChanged = true;
-              }
-            }
-          });
-
-          if (mergedHasChanged) {
-            const sortedMerged = Array.from(localMap.values()).sort((a, b) => b.timestamp - a.timestamp);
-            saveTransactionHistory(sortedMerged);
-          }
-        })
-        .catch(e => console.warn('Supabase background fetch skipped/failed:', e));
-    }
-
     return () => {
       window.removeEventListener(EVENT_NAME, handleUpdate);
     };
   }, [address, loadHistory]);
 
+  const clear = useCallback(() => {
+    clearTransactionHistory(address);
+  }, [address]);
+
   return {
     history,
-    clearHistory: () => {
-      if (address) {
-        clearTransactionHistory(address);
-      }
-    },
-    refresh: loadHistory
+    isLoading,
+    clearHistory: clear,
+    refreshHistory: loadHistory
   };
 }

@@ -93,7 +93,7 @@ export function useUSDCBalance(chainId: number) {
         abi: ERC20_ABI,
         functionName: 'balanceOf',
         args: address ? [address] : undefined,
-        chainId: chainMeta?.isNativeArc ? undefined : chainId,
+        chainId: chainId as any,
         query: {
             enabled: !isSolana && isConnected && !!address && !!usdcAddress,
             staleTime: 10000,
@@ -189,15 +189,6 @@ export function useUSDCBalance(chainId: number) {
         finalBalance = manualBalance;
     }
 
-    // Apply local swap credit offset if on Arc Testnet (5042002).
-    // NOTE: this offset is written by the Swap tab, which credits the "received" token only in
-    // localStorage rather than on-chain. See Issue 14 in AUDIT_REPORT.md — this display path
-    // will show a balance that does not exist on-chain.
-    if (chainId === 5042002 && address && typeof window !== 'undefined') {
-        const localOffset = parseFloat(localStorage.getItem(`arc_credit_USDC_${address}`) || '0');
-        finalBalance = Math.max(0, finalBalance + localOffset);
-    }
-
     const isCurrentlyLoading = isSolana
         ? (manualBalance === null && isManualLoading)
         : (isLoading && manualBalance === null && isManualLoading);
@@ -212,7 +203,7 @@ export function useUSDCBalance(chainId: number) {
     return {
         rawBalance: !isSolana && balance !== undefined
             ? balance
-            : (manualBalance !== null ? BigInt(Math.floor(manualBalance * 10 ** USDC_DECIMALS)) : undefined),
+            : (manualBalance !== null ? BigInt(Math.round(manualBalance * 10 ** USDC_DECIMALS)) : undefined),
         formattedBalance: displayBalance,
         balanceNum: walletConnected ? finalBalance : 0,
         isLoading: walletConnected ? isCurrentlyLoading : false,

@@ -90,15 +90,13 @@ const BALANCE_OF_SELECTOR = '0x70a08231';
  * Returns null when every endpoint fails, which callers treat as "unknown", distinct
  * from a real zero balance.
  */
-export async function readErc20Balance(
+export async function readErc20BalanceRaw(
   chainId: number,
   tokenAddress: string,
-  ownerAddress: string,
-  decimals: number
-): Promise<number | null> {
+  ownerAddress: string
+): Promise<bigint | null> {
   if (!ownerAddress || !tokenAddress) return null;
 
-  // ABI encoding for balanceOf(address): selector + 32-byte left-padded address.
   const paddedOwner = ownerAddress.toLowerCase().replace('0x', '').padStart(64, '0');
   const data = `${BALANCE_OF_SELECTOR}${paddedOwner}`;
 
@@ -110,7 +108,27 @@ export async function readErc20Balance(
   if (!result || result === '0x') return null;
 
   try {
-    return Number(BigInt(result)) / 10 ** decimals;
+    return BigInt(result);
+  } catch {
+    return null;
+  }
+}
+
+export async function readErc20Balance(
+  chainId: number,
+  tokenAddress: string,
+  ownerAddress: string,
+  decimals: number
+): Promise<number | null> {
+  const raw = await readErc20BalanceRaw(chainId, tokenAddress, ownerAddress);
+  if (raw === null) return null;
+
+  try {
+    const divisor = BigInt(10 ** decimals);
+    const whole = raw / divisor;
+    const fraction = raw % divisor;
+    const fullStr = `${whole}.${fraction.toString().padStart(decimals, '0')}`;
+    return parseFloat(fullStr);
   } catch {
     return null;
   }

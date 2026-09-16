@@ -9,7 +9,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Trash2, ExternalLink, Calendar, ArrowRight, Activity, ShieldAlert, CheckCircle2, Clock, Loader2, Search } from 'lucide-react';
 import { useTransactionHistory, BridgeTransaction } from '../../hooks/useTransactionHistory';
 import { getChainById, SUPPORTED_CHAINS } from '../../constants/chains';
-import { keccak256 } from 'viem';
+import { decodeMessageV2 } from '../../lib/cctp/messageV2';
+import { getChainConfig, getIrisApiBaseUrl } from '../../lib/registry';
 import { writeContract, waitForTransactionReceipt, getAccount, switchChain, getGasPrice } from '@wagmi/core';
 import { config } from '../../lib/wagmi';
 import { rpcCall } from '../../lib/rpcClient';
@@ -74,9 +75,9 @@ export default function TransactionHistoryDrawer({
   const hoverCardBg = isDark ? 'hover:bg-[#131B2E]/90' : 'hover:bg-slate-50';
 
   const getMessageTransmitterAddress = (chainId: number): string => {
-    // Always return the custom MessageTransmitter V2 address deployed by Arc Network across all supported testnets.
-    // This is required because we burn using Arc's custom TokenMessenger (0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA).
-    return '0xe737e5cebeeba77efe34d4aa090756590b1ce275';
+    const cfg = getChainConfig(chainId);
+    if (cfg?.messageTransmitterAddress) return cfg.messageTransmitterAddress;
+    return '0x81D40F21F12A8F0E3252Bccb954D722d4c464B64';
   };
 
   const formatAddress = (addr: string) => {
@@ -188,8 +189,8 @@ export default function TransactionHistoryDrawer({
     };
 
     try {
-      // Fetch official attestation details from Circle Sandbox Iris API
-      const attestUrl = `https://iris-api-sandbox.circle.com/v2/messages/${sourceChain.domain}?transactionHash=${cleanHash}`;
+      // Fetch official attestation details from Circle Iris API (environment-aware)
+      const attestUrl = `${getIrisApiBaseUrl()}/v2/messages/${sourceChain.domain}?transactionHash=${cleanHash}`;
       const attestRes = await fetch(attestUrl);
       
       if (!attestRes.ok) {
@@ -221,8 +222,17 @@ export default function TransactionHistoryDrawer({
         return;
       }
 
-      // Even if pending, we can still decode the destination from message bytes
-      const pendingDestName = messageObj.message ? decodeDestChain(messageObj.message) : undefined;
+      // Decode destination chain using MessageV2 parser
+      let decoded;
+      try {
+        decoded = decodeMessageV2(messageObj.message);
+      } catch {
+        // Fallback for non-standard message
+      }
+
+      const destDomain = decoded ? decoded.destinationDomain : undefined;
+      const destChain = destDomain !== undefined ? rpcs.find(r => r.domain === destDomain) : undefined;
+      const pendingDestName = destChain ? destChain.name : (destDomain !== undefined ? `Domain ${destDomain}` : undefined);
 
       if (messageObj.status !== 'complete') {
         setIsScanning(false);
@@ -239,24 +249,12 @@ export default function TransactionHistoryDrawer({
 
       // Attestation is complete!
       const messageBytes = messageObj.message as string;
-      const cleanBytes = messageBytes.startsWith('0x') ? messageBytes.slice(2) : messageBytes;
-
-      const destDomain = parseInt(cleanBytes.substring(16, 24), 16);
-      const destChain = rpcs.find(r => r.domain === destDomain);
-
-      const sourceDomain = parseInt(cleanBytes.substring(8, 16), 16);
-      const nonceHex = cleanBytes.substring(24, 40);
-
-      // Pack parameters for keccak256
-      const domainHex = sourceDomain.toString(16).padStart(8, '0');
-      const packedHex = '0x' + domainHex + nonceHex.padStart(16, '0');
+      const decodedMsg = decoded || decodeMessageV2(messageBytes);
 
       let mintStatus: 'complete' | 'pending' = 'pending';
 
       if (destChain) {
         try {
-          // Registry-aware client, so a CORS-blocked destination (Arc) is read through the
-          // proxy instead of failing and leaving a completed mint displayed as "pending".
           const destClient = getPublicClientForChain(destChain.id);
           const used = await destClient.readContract({
             address: getMessageTransmitterAddress(destChain.id) as `0x${string}`,
@@ -265,12 +263,12 @@ export default function TransactionHistoryDrawer({
                 name: 'usedNonces',
                 type: 'function',
                 stateMutability: 'view',
-                inputs: [{ name: 'sourceAndNonce', type: 'bytes32' }],
+                inputs: [{ name: 'nonce', type: 'bytes32' }],
                 outputs: [{ type: 'uint256' }]
               }
             ],
             functionName: 'usedNonces',
-            args: [keccak256(packedHex as `0x${string}`)]
+            args: [decodedMsg.nonce]
           });
           if (used > BigInt(0)) {
             mintStatus = 'complete';

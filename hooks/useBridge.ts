@@ -1,28 +1,29 @@
 // hooks/useBridge.ts
-// Core CCTP Bridge Hook — All routes use Circle CCTP Forwarding Service (depositForBurnWithHook).
-// 3-step flow: Approve → Burn & Forward → Circle Auto-Relay. No manual mint required.
+// Core CCTP v2 Bridge Hook — Production-hardened with typed lifecycle,
+// immediate burn persistence, active Wagmi connector provider support,
+// and on-chain destination execution verification.
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { getChainById } from '../constants/chains';
+import { getChainById, ChainMetadata } from '../constants/chains';
 import { writeContract, waitForTransactionReceipt, getAccount, switchChain, getGasPrice, readContract } from '@wagmi/core';
 import { config } from '../lib/wagmi';
 import { parseUnits, pad } from 'viem';
 import { addTransaction, updateTransaction } from './useTransactionHistory';
+import { getChainConfig, getIrisApiBaseUrl, getActiveEnvironment, validateRoute } from '../lib/registry';
+import { decodeMessageV2 } from '../lib/cctp/messageV2';
+import { getRouteFeeQuote, parseUsdcUnits, validateAmountInput } from '../lib/bridge/quotes';
+import { getPublicClientForChain } from '../lib/publicClient';
 
 // Solana & Circle AppKit Imports
 import { useWallet } from '@solana/wallet-adapter-react';
 import { Connection, PublicKey as SolanaPublicKey } from '@solana/web3.js';
-import { createViemAdapterFromProvider } from '@circle-fin/adapter-viem-v2';
-import { appKit } from '../lib/appKit';
 import { getSolanaRpcUrl } from '../lib/rpcEndpoints';
-import { circlePublicClientFactory } from '../lib/publicClient';
 
 // Forwarding Service Magic Bytes
 export const CCTP_FORWARD_HOOK_DATA = '0x636374702d666f72776172640000000000000000000000000000000000000000' as `0x${string}`;
 
 /**
  * Derives the Solana Associated Token Account (ATA) for a wallet address and USDC mint.
- * Required by Circle CCTP Forwarding Service when destination is Solana.
  */
 export function getSolanaUsdcAta(walletPubKey: SolanaPublicKey, usdcMintPubKey: SolanaPublicKey): SolanaPublicKey {
   const TOKEN_PROGRAM_ID = new SolanaPublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
@@ -34,112 +35,7 @@ export function getSolanaUsdcAta(walletPubKey: SolanaPublicKey, usdcMintPubKey: 
   return ata;
 }
 
-// Helper to build a Solana provider compliant with Circle's SolanaAdapter Zod validation requirements
-function buildSolanaProviderAdapter(solanaWallet: any) {
-  const activeAdapter = solanaWallet?.wallet?.adapter;
-  const windowSolana = (typeof window !== 'undefined' && (window as any).solana);
-
-  const rawProvider = activeAdapter ?? windowSolana ?? solanaWallet;
-
-  const isConnected = Boolean(
-    solanaWallet?.connected ||
-    solanaWallet?.publicKey ||
-    (typeof rawProvider?.isConnected === 'boolean' ? rawProvider.isConnected : false) ||
-    (typeof rawProvider?.isConnected === 'function' ? rawProvider.isConnected() : false) ||
-    rawProvider?.connected ||
-    (typeof windowSolana?.isConnected === 'boolean' ? windowSolana.isConnected : false) ||
-    (typeof windowSolana?.isConnected === 'function' ? windowSolana.isConnected() : false) ||
-    windowSolana?.connected ||
-    windowSolana?.publicKey
-  );
-
-  const publicKey = solanaWallet?.publicKey ?? rawProvider?.publicKey ?? windowSolana?.publicKey ?? null;
-
-  const signTransaction = (transaction: any) => {
-    if (solanaWallet?.signTransaction) return solanaWallet.signTransaction(transaction);
-    if (rawProvider?.signTransaction) return rawProvider.signTransaction(transaction);
-    if (windowSolana?.signTransaction) return windowSolana.signTransaction(transaction);
-    throw new Error('Solana wallet does not support signTransaction.');
-  };
-
-  const signAllTransactions = (transactions: any[]) => {
-    if (solanaWallet?.signAllTransactions) return solanaWallet.signAllTransactions(transactions);
-    if (rawProvider?.signAllTransactions) return rawProvider.signAllTransactions(transactions);
-    if (windowSolana?.signAllTransactions) return windowSolana.signAllTransactions(transactions);
-    throw new Error('Solana wallet does not support signAllTransactions.');
-  };
-
-  const signMessage = (message: any) => {
-    if (solanaWallet?.signMessage) return solanaWallet.signMessage(message);
-    if (rawProvider?.signMessage) return rawProvider.signMessage(message);
-    if (windowSolana?.signMessage) return windowSolana.signMessage(message);
-    throw new Error('Solana wallet does not support signMessage.');
-  };
-
-  const connect = () => {
-    if (solanaWallet?.connect) return solanaWallet.connect();
-    if (rawProvider?.connect) return rawProvider.connect();
-    if (windowSolana?.connect) return windowSolana.connect();
-    return Promise.resolve();
-  };
-
-  const disconnect = () => {
-    if (solanaWallet?.disconnect) return solanaWallet.disconnect();
-    if (rawProvider?.disconnect) return rawProvider.disconnect();
-    if (windowSolana?.disconnect) return windowSolana.disconnect();
-    return Promise.resolve();
-  };
-
-  return {
-    ...(typeof rawProvider === 'object' ? rawProvider : {}),
-    isConnected: isConnected,
-    connected: isConnected,
-    publicKey: publicKey,
-    signTransaction,
-    signAllTransactions,
-    signMessage,
-    connect,
-    disconnect,
-  };
-}
-
-function assertValidSolanaProvider(provider: any, context: 'source' | 'destination'): void {
-  const where = `${context} Solana wallet`;
-
-  if (!provider || typeof provider !== 'object') {
-    throw new Error(
-      `Could not read your ${where}. Open your Solana wallet extension (e.g. Phantom), unlock it, and reconnect.`
-    );
-  }
-
-  if (!provider.publicKey) {
-    throw new Error(
-      `Your ${where} is not reporting an account address. Unlock the wallet and reconnect using the Phantom button in the navbar.`
-    );
-  }
-
-  if (typeof provider.publicKey.toBase58 !== 'function' && typeof provider.publicKey.toString !== 'function') {
-    throw new Error(
-      `Your ${where} returned an account address in an unrecognised format. Try updating your wallet extension.`
-    );
-  }
-
-  if (provider.isConnected !== true) {
-    throw new Error(
-      `Your ${where} is not connected. Connect it using the Phantom button in the navbar, then try again.`
-    );
-  }
-
-  for (const method of ['signTransaction', 'signAllTransactions'] as const) {
-    if (typeof provider[method] !== 'function') {
-      throw new Error(
-        `Your ${where} does not expose ${method}(), which Circle CCTP requires to move USDC.`
-      );
-    }
-  }
-}
-
-// ERC-20 ABI required for enforcing spend approvals
+// ERC-20 ABI required for spend approvals
 const ERC20_ABI = [
   {
     name: 'approve',
@@ -147,7 +43,17 @@ const ERC20_ABI = [
     stateMutability: 'nonpayable',
     inputs: [{ name: 'spender', type: 'address' }, { name: 'amount', type: 'uint256' }],
     outputs: [{ name: '', type: 'bool' }],
-  }
+  },
+  {
+    name: 'allowance',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [
+      { name: 'owner', type: 'address' },
+      { name: 'spender', type: 'address' }
+    ],
+    outputs: [{ type: 'uint256' }],
+  },
 ] as const;
 
 // TokenMessenger ABI supporting depositForBurn and depositForBurnWithHook
@@ -185,7 +91,7 @@ const TOKEN_MESSENGER_ABI = [
   }
 ] as const;
 
-// MessageTransmitter receiveMessage ABI
+// MessageTransmitter receiveMessage and usedNonces ABI
 const MESSAGE_TRANSMITTER_ABI = [
   {
     name: 'receiveMessage',
@@ -196,10 +102,17 @@ const MESSAGE_TRANSMITTER_ABI = [
       { name: 'attestation', type: 'bytes' }
     ],
     outputs: []
+  },
+  {
+    name: 'usedNonces',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [{ name: 'nonce', type: 'bytes32' }],
+    outputs: [{ type: 'uint256' }]
   }
 ] as const;
 
-export type BridgeStepName = 'approve' | 'burn' | 'attest' | 'mint';
+export type BridgeStepName = 'approve' | 'burn' | 'attest' | 'relay';
 
 export interface BridgeStep {
   name: BridgeStepName;
@@ -225,23 +138,26 @@ interface AttestationResponse {
 export class AttestationTimeoutError extends Error {
   constructor(public readonly burnTxHash: string) {
     super(
-      'Your USDC was burned on the source chain, but the Circle attestation has not arrived yet. ' +
-      'Funds are not lost — the transfer can be completed once the attestation is available. ' +
-      `Save this burn transaction hash: ${burnTxHash}`
+      'Your USDC was successfully burned on the source chain, but Circle Iris attestation has not arrived yet. ' +
+      'Your funds are safe on-chain and can be recovered once attestation is ready. ' +
+      `Burn transaction hash: ${burnTxHash}`
     );
     this.name = 'AttestationTimeoutError';
   }
 }
 
 /**
- * Polls Circle's Iris API for the attestation covering a burn.
+ * Polls Circle's Iris API for attestation corresponding to the burn transaction.
+ * Matches destination domain to ensure the correct message is retrieved if multiple exist.
  */
 async function retrieveAttestation(
   transactionHash: string,
   fromDomain: number,
+  expectedDestDomain?: number,
   maxAttempts = 60
 ): Promise<AttestationMessage> {
-  const url = `https://iris-api-sandbox.circle.com/v2/messages/${fromDomain}?transactionHash=${transactionHash}`;
+  const baseUrl = getIrisApiBaseUrl();
+  const url = `${baseUrl}/v2/messages/${fromDomain}?transactionHash=${transactionHash}`;
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     try {
@@ -249,9 +165,24 @@ async function retrieveAttestation(
 
       if (response.ok) {
         const data = (await response.json()) as AttestationResponse;
-        const message = data?.messages?.[0];
-        if (message?.status === 'complete') {
-          return message;
+        const messages = data?.messages || [];
+
+        // Match expected message if destination domain is known
+        for (const msg of messages) {
+          if (msg.status === 'complete') {
+            if (expectedDestDomain !== undefined && msg.message) {
+              try {
+                const decoded = decodeMessageV2(msg.message);
+                if (decoded.destinationDomain === expectedDestDomain) {
+                  return msg;
+                }
+              } catch {
+                return msg;
+              }
+            } else {
+              return msg;
+            }
+          }
         }
       } else if (response.status === 429) {
         const retryAfter = Number(response.headers.get('Retry-After'));
@@ -262,7 +193,7 @@ async function retrieveAttestation(
       } else if (response.status >= 400 && response.status < 500 && response.status !== 404) {
         throw new Error(
           `Circle attestation request rejected (HTTP ${response.status}). ` +
-          `This usually means the source domain (${fromDomain}) or transaction hash is invalid.`
+          `Verify domain (${fromDomain}) and transaction hash.`
         );
       }
     } catch (error) {
@@ -272,31 +203,23 @@ async function retrieveAttestation(
       console.warn(`Attestation poll attempt ${attempt + 1} failed:`, error);
     }
 
-    const backoff = Math.min(1000 * 1.5 ** attempt, 6000);
-    const jitter = Math.random() * 500;
+    const backoff = Math.min(1000 * 1.5 ** attempt, 5000);
+    const jitter = Math.random() * 400;
     await new Promise((resolve) => setTimeout(resolve, backoff + jitter));
   }
 
   throw new AttestationTimeoutError(transactionHash);
 }
 
-const MESSAGE_TRANSMITTER_ADDRESS = '0xe737e5cebeeba77efe34d4aa090756590b1ce275';
-const getMessageTransmitterAddress = (): string => MESSAGE_TRANSMITTER_ADDRESS;
-
-export const MIN_BRIDGE_AMOUNT = 0.1;
+export const MIN_BRIDGE_AMOUNT = 0.05;
 
 export function validateBridgeAmount(amount: string, availableBalance?: number): string | null {
-  if (!amount || amount.trim() === '') return 'Enter an amount to bridge';
+  const validation = validateAmountInput(amount);
+  if (!validation.valid) return validation.error || 'Invalid amount';
 
-  const parsed = Number(amount);
-  if (!Number.isFinite(parsed)) return 'Enter a valid number';
-  if (parsed <= 0) return 'Amount must be greater than 0';
-
-  const decimals = amount.includes('.') ? amount.split('.')[1].length : 0;
-  if (decimals > 6) return 'USDC supports a maximum of 6 decimal places';
-
+  const parsed = Number(validation.cleanValue);
   if (parsed < MIN_BRIDGE_AMOUNT) {
-    return `Minimum bridge amount is ${MIN_BRIDGE_AMOUNT} USDC — smaller transfers are rejected by CCTP because the fee would exceed the amount`;
+    return `Minimum bridge amount is ${MIN_BRIDGE_AMOUNT} USDC.`;
   }
 
   if (availableBalance !== undefined && parsed > availableBalance) {
@@ -312,6 +235,7 @@ export function useBridge() {
   useEffect(() => {
     solanaWalletRef.current = solanaWallet;
   });
+
   const [status, setStatus] = useState<BridgeStatus>('idle');
   const [error, setError] = useState<string | null>(null);
 
@@ -336,14 +260,20 @@ export function useBridge() {
     {
       name: 'burn',
       status: 'pending',
-      label: 'Burn & Forward USDC',
-      description: 'Burning USDC & registering Circle auto-relay hook',
+      label: 'Deposit for Burn',
+      description: 'Submitting burn transaction on source chain',
     },
     {
       name: 'attest',
       status: 'pending',
-      label: 'Circle Auto-Relaying',
-      description: 'Circle is processing & minting on destination automatically',
+      label: 'Circle Attestation',
+      description: 'Awaiting Circle Iris protocol attestation',
+    },
+    {
+      name: 'relay',
+      status: 'pending',
+      label: 'Destination Mint',
+      description: 'Verifying USDC minted to destination wallet',
     },
   ]);
 
@@ -353,27 +283,9 @@ export function useBridge() {
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const attestTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  useEffect(() => {
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-      if (attestTimerRef.current) clearInterval(attestTimerRef.current);
-    };
-  }, []);
-
-  const accountInfo = getAccount(config);
-  useEffect(() => {
-    if (!accountInfo.isConnected && !solanaWallet.connected && status === 'bridging') {
-      setStatus('error');
-      setError('Wallet disconnected during bridging operation.');
-      if (timerRef.current) clearInterval(timerRef.current);
-      if (attestTimerRef.current) clearInterval(attestTimerRef.current);
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('bridge-state-change', { detail: { isBridging: false } }));
-      }
-    }
-  }, [accountInfo.isConnected, solanaWallet.connected, status]);
-
   const reset = useCallback(() => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    if (attestTimerRef.current) clearInterval(attestTimerRef.current);
     setStatus('idle');
     setError(null);
     setElapsedSeconds(0);
@@ -390,306 +302,62 @@ export function useBridge() {
       {
         name: 'burn',
         status: 'pending',
-        label: 'Burn & Forward USDC',
-        description: 'Burning USDC & registering Circle auto-relay hook',
+        label: 'Deposit for Burn',
+        description: 'Submitting burn transaction on source chain',
       },
       {
         name: 'attest',
         status: 'pending',
-        label: 'Circle Auto-Relaying',
-        description: 'Circle is processing & minting on destination automatically',
+        label: 'Circle Attestation',
+        description: 'Awaiting Circle Iris protocol attestation',
+      },
+      {
+        name: 'relay',
+        status: 'pending',
+        label: 'Destination Mint',
+        description: 'Verifying USDC minted to destination wallet',
       },
     ]);
-    if (timerRef.current) clearInterval(timerRef.current);
-    if (attestTimerRef.current) clearInterval(attestTimerRef.current);
-
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('bridge-state-change', { detail: { isBridging: false } }));
-    }
   }, []);
 
   const executeBridge = useCallback(async (
-    fromChainId: number,
-    toChainId: number,
+    fromChain: ChainMetadata,
+    toChain: ChainMetadata,
     amount: string,
-    speedMode: 'fast' | 'standard' = 'fast'
+    speedMode: 'fast' | 'standard' = 'standard'
   ) => {
-    const solanaWallet = solanaWalletRef.current;
     reset();
-    setStatus('bridging');
 
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('bridge-state-change', { detail: { isBridging: true } }));
+    // Verify route boundary rules
+    const routeCap = validateRoute(fromChain.id, toChain.id);
+    if (!routeCap.enabled) {
+      setStatus('error');
+      setError(routeCap.reason || 'This route is currently unavailable.');
+      return;
     }
+
+    const amountErr = validateBridgeAmount(amount);
+    if (amountErr) {
+      setStatus('error');
+      setError(amountErr);
+      return;
+    }
+
+    setStatus('bridging');
+    setElapsedSeconds(0);
+    setAttestationElapsed(0);
 
     timerRef.current = setInterval(() => {
       setElapsedSeconds(prev => prev + 1);
     }, 1000);
 
-    const fromChain = getChainById(fromChainId);
-    const toChain = getChainById(toChainId);
-
-    if (!fromChain || !toChain) {
-      setStatus('error');
-      setError('Unsupported chain configuration selected.');
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('bridge-state-change', { detail: { isBridging: false } }));
-      }
-      return;
-    }
-
-    const amountValidationError = validateBridgeAmount(amount);
-    if (amountValidationError) {
-      setStatus('error');
-      setError(amountValidationError);
-      if (timerRef.current) clearInterval(timerRef.current);
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('bridge-state-change', { detail: { isBridging: false } }));
-      }
-      return;
-    }
-
-    if (fromChain.isComingSoon || toChain.isComingSoon) {
-      const unsupported = fromChain.isComingSoon ? fromChain.name : toChain.name;
-      setStatus('error');
-      setError(`${unsupported} is not yet supported for CCTP transfers.`);
-      if (timerRef.current) clearInterval(timerRef.current);
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('bridge-state-change', { detail: { isBridging: false } }));
-      }
-      return;
-    }
-
-    if (typeof window === 'undefined') return;
-
-    // All routes use Circle CCTP Forwarding Service — always 3-step auto-relay
-    const isForwarding = true;
-
-    // ─── SOLANA ROUTE (AppKit) ──────────────────────────────────────────
-    const isSolanaRoute = fromChain.isSolana || toChain.isSolana;
-    if (isSolanaRoute) {
-      if (fromChain.isSolana && (!solanaWallet.connected || !solanaWallet.publicKey)) {
-        setStatus('error');
-        setError('Please connect your Solana wallet first.');
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('bridge-state-change', { detail: { isBridging: false } }));
-        }
-        return;
-      }
-      if (toChain.isSolana && !solanaWallet.publicKey) {
-        if (solanaWallet.wallet && !solanaWallet.connected) {
-          try { await solanaWallet.connect(); } catch (e) {}
-        }
-        if (!solanaWallet.publicKey) {
-          setStatus('error');
-          setError('Please connect your Solana (Phantom) wallet using the Phantom button in the navbar, then try again.');
-          if (typeof window !== 'undefined') {
-            window.dispatchEvent(new CustomEvent('bridge-state-change', { detail: { isBridging: false } }));
-          }
-          return;
-        }
-      }
-      if (!fromChain.isSolana) {
-        const accountInfo = getAccount(config);
-        if (!accountInfo.isConnected || !accountInfo.address) {
-          setStatus('error');
-          setError('Please connect your EVM wallet first.');
-          if (typeof window !== 'undefined') {
-            window.dispatchEvent(new CustomEvent('bridge-state-change', { detail: { isBridging: false } }));
-          }
-          return;
-        }
-        if (accountInfo.chainId !== fromChain.id) {
-          try {
-            await switchChain(config, { chainId: fromChain.id as any });
-          } catch (e: any) {
-            setStatus('error');
-            setError(`Please switch your EVM wallet network to ${fromChain.name}.`);
-            if (typeof window !== 'undefined') {
-              window.dispatchEvent(new CustomEvent('bridge-state-change', { detail: { isBridging: false } }));
-            }
-            return;
-          }
-        }
-      }
-
-      setSteps([
-        {
-          name: 'approve',
-          status: 'pending',
-          label: 'Approve Spend',
-          description: `Approving USDC spend on ${fromChain.name}`,
-        },
-        {
-          name: 'burn',
-          status: 'pending',
-          label: 'Burn & Forward USDC',
-          description: `Burning USDC & registering Circle auto-relay hook on ${fromChain.name}`,
-        },
-        {
-          name: 'attest',
-          status: 'pending',
-          label: 'Circle Auto-Relaying',
-          description: 'Circle is processing attestation & minting on destination automatically',
-        },
-      ]);
-
-      try {
-        let sourceAdapter: any;
-        let destAdapter: any;
-
-        const solanaProviderForAdapter = buildSolanaProviderAdapter(solanaWallet);
-
-        if (fromChain.isSolana) {
-          assertValidSolanaProvider(solanaProviderForAdapter, 'source');
-          const solanaAdapters = await import('@circle-fin/adapter-solana');
-          sourceAdapter = await solanaAdapters.createSolanaAdapterFromProvider({
-            provider: solanaProviderForAdapter as any,
-            connection: new Connection(fromChain.rpcUrl || getSolanaRpcUrl(), 'confirmed'),
-          });
-        } else {
-          if (!window.ethereum) {
-            throw new Error('EVM Wallet provider not detected. Please install/connect your EVM wallet.');
-          }
-          sourceAdapter = await createViemAdapterFromProvider({
-            provider: window.ethereum as any,
-            getPublicClient: circlePublicClientFactory,
-          });
-        }
-
-        if (toChain.isSolana) {
-          if (!solanaWallet.publicKey) {
-            if (solanaWallet.wallet) {
-              try { await solanaWallet.connect(); } catch (_) {}
-            }
-            if (!solanaWallet.publicKey) {
-              throw new Error('Please connect your Solana (Phantom) wallet before bridging to Solana.');
-            }
-          }
-          assertValidSolanaProvider(solanaProviderForAdapter, 'destination');
-          const solanaAdapters = await import('@circle-fin/adapter-solana');
-          destAdapter = await solanaAdapters.createSolanaAdapterFromProvider({
-            provider: solanaProviderForAdapter as any,
-            connection: new Connection(toChain.rpcUrl || getSolanaRpcUrl(), 'confirmed'),
-          });
-        } else {
-          if (!window.ethereum) {
-            throw new Error('EVM Wallet provider not detected. Please install/connect your EVM wallet.');
-          }
-          destAdapter = await createViemAdapterFromProvider({
-            provider: window.ethereum as any,
-            getPublicClient: circlePublicClientFactory,
-          });
-        }
-
-        let tempBurnHash = '';
-        const handleWildcard = (event: any) => {
-          const method = event?.method || '';
-          console.log('Circle CCTP event:', method, event);
-
-          if (method === 'approve') {
-            const txHash = event.values?.txHash || '';
-            setSteps(prev => prev.map(s => s.name === 'approve' ? {
-              ...s, status: 'done',
-              txHash: txHash ? (txHash.substring(0, 10) + '...') : 'Approved',
-              explorerUrl: txHash ? `${fromChain.explorerUrl}/tx/${txHash}` : undefined
-            } : s));
-            setSteps(prev => prev.map(s => s.name === 'burn' ? { ...s, status: 'active' } : s));
-
-          } else if (method === 'burn') {
-            const txHash = event.values?.txHash || '';
-            tempBurnHash = txHash;
-            setSourceTxHash(txHash);
-            addTransaction({
-              id: txHash || `sol_${Date.now()}`,
-              userAddress: fromChain.isSolana
-                ? (solanaWallet.publicKey?.toBase58() || '')
-                : (getAccount(config).address || ''),
-              fromChainId: fromChain.id,
-              toChainId: toChain.id,
-              amount,
-              status: 'pending',
-              burnTxHash: txHash
-            });
-            setSteps(prev => prev.map(s => s.name === 'burn' ? {
-              ...s, status: 'done',
-              txHash: txHash ? (txHash.substring(0, 10) + '...') : 'Burned',
-              explorerUrl: fromChain.isSolana
-                ? `https://solscan.io/tx/${txHash}?cluster=devnet`
-                : `${fromChain.explorerUrl}/tx/${txHash}`
-            } : s));
-            setSteps(prev => prev.map(s => s.name === 'attest' ? { ...s, status: 'active' } : s));
-
-          } else if (method === 'fetchAttestation') {
-            setSteps(prev => prev.map(s => s.name === 'attest' ? {
-              ...s, status: 'done', txHash: 'Auto-Relayed',
-              explorerUrl: `https://iris-api-sandbox.circle.com/v2/messages/${fromChain.cctpDomain}?transactionHash=${tempBurnHash}`
-            } : s));
-          }
-        };
-
-        appKit.on('*', handleWildcard);
-
-        try {
-          setSteps(prev => prev.map(s => s.name === 'approve' ? { ...s, status: 'active' } : s));
-
-          const result = await appKit.bridge({
-            from: { adapter: sourceAdapter, chain: fromChain.appKitId as any },
-            to: { adapter: destAdapter, chain: toChain.appKitId as any },
-            amount: amount,
-            token: 'USDC',
-          });
-
-          if (result.state === 'success') {
-            setStatus('success');
-            window.dispatchEvent(new Event('bridge-success-refresh'));
-          } else {
-            const steps = (result as any)?.steps || [];
-            const failedStep = steps.find((s: any) => s.state === 'error' || s.status === 'error');
-            const stepName = failedStep?.name || 'unknown';
-            const stepErrMsg = failedStep?.errorMessage || failedStep?.error?.message || failedStep?.error;
-            const rootErr = (result as any)?.error?.message || (result as any)?.errorMessage || (result as any)?.error;
-
-            const detailedMsg = stepErrMsg
-              ? `Bridge step "${stepName}" failed: ${typeof stepErrMsg === 'object' ? JSON.stringify(stepErrMsg) : stepErrMsg}`
-              : rootErr
-              ? `Bridge failed: ${typeof rootErr === 'object' ? JSON.stringify(rootErr) : rootErr}`
-              : `Bridge execution failed (state: ${result.state})`;
-
-            throw new Error(detailedMsg);
-          }
-        } finally {
-          appKit.off('*', handleWildcard);
-        }
-      } catch (err: any) {
-        console.error('Solana-based CCTP bridge error:', err);
-        setStatus('error');
-        setError(err?.message || 'An unexpected error occurred during Solana bridging.');
-        setSteps(prev => prev.map(s => s.status === 'active' ? { ...s, status: 'error' } : s));
-      } finally {
-        if (timerRef.current) clearInterval(timerRef.current);
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('bridge-state-change', { detail: { isBridging: false } }));
-        }
-      }
-      return;
-    }
-
-    // ─── EVM ROUTE (Direct CCTP Contracts) ──────────────────────────────
-    if (!window.ethereum) {
-      setStatus('error');
-      setError('No compatible EVM browser wallet detected. Please connect MetaMask, OKX, or Rabby.');
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('bridge-state-change', { detail: { isBridging: false } }));
-      }
-      return;
-    }
-
     let activeBurnHash: string | undefined = undefined;
+    let burnConfirmedOnChain = false;
+
     try {
       const accountInfo = getAccount(config);
       if (!accountInfo.isConnected || !accountInfo.address) {
-        throw new Error('Please connect your wallet first.');
+        throw new Error('Please connect your EVM wallet first.');
       }
 
       if (accountInfo.chainId !== fromChain.id) {
@@ -698,79 +366,23 @@ export function useBridge() {
 
       const fromDomain = fromChain.cctpDomain ?? 0;
       const toDomain = toChain.cctpDomain ?? 0;
+      const isForwarding = toChain.supportsForwarding;
 
-      // Always 3 steps: Approve → Burn & Forward → Circle Auto-Relay
-      setSteps([
-        {
-          name: 'approve',
-          status: 'pending',
-          label: 'Approve Spend',
-          description: `Approving USDC spend on ${fromChain.name}`,
-        },
-        {
-          name: 'burn',
-          status: 'pending',
-          label: 'Burn & Forward USDC',
-          description: `Burning USDC & attaching Circle auto-relay hook on ${fromChain.name}`,
-        },
-        {
-          name: 'attest',
-          status: 'pending',
-          label: 'Circle Auto-Relaying',
-          description: 'Circle is completing attestation & minting on destination automatically',
-        },
-      ]);
+      const srcConfig = getChainConfig(fromChain.id);
+      const dstConfig = getChainConfig(toChain.id);
 
-      const tokenMessenger = '0x8FE6B999Dc680CcFDD5Bf7EB0974218be2542DAA';
-      const destinationTransmitter = getMessageTransmitterAddress();
+      const tokenMessenger = srcConfig?.tokenMessengerAddress || '0x28b5a0e9C621a5BadaA536219b3a228C8168cf5d';
+      const destinationTransmitter = dstConfig?.messageTransmitterAddress || '0x81D40F21F12A8F0E3252Bccb954D722d4c464B64';
 
-      let decimals = 6;
-      try {
-        const tokenDecimals = await readContract(config, {
-          address: fromChain.usdcAddress as `0x${string}`,
-          abi: [
-            {
-              name: 'decimals',
-              type: 'function',
-              stateMutability: 'view',
-              inputs: [],
-              outputs: [{ type: 'uint8' }],
-            },
-          ],
-          functionName: 'decimals',
-        });
-        if (typeof tokenDecimals === 'number') {
-          decimals = tokenDecimals;
-        }
-      } catch (err) {
-        console.warn("Failed to fetch decimals dynamically, defaulting to 6:", err);
-      }
+      const amountInUnits = parseUsdcUnits(amount);
 
-      const amountInUnits = parseUnits(amount, decimals);
-
-      // Resolve destination mintRecipient bytes32
-      let destinationAddressBytes32: `0x${string}`;
-
-      if (toChain.isSolana) {
-        // Step 3 Solana Rule: recipient address must be recipient's USDC ATA for Solana destination when forwarding
-        if (!solanaWallet.publicKey) {
-          throw new Error('Solana (Phantom) wallet is required to resolve recipient ATA for Solana destination.');
-        }
-        const usdcMintPubKey = new SolanaPublicKey(toChain.usdcAddress);
-        const ataPubKey = getSolanaUsdcAta(solanaWallet.publicKey, usdcMintPubKey);
-        const ataHex = ataPubKey.toBuffer().toString('hex');
-        destinationAddressBytes32 = ('0x' + ataHex) as `0x${string}`;
-      } else {
-        destinationAddressBytes32 = pad(accountInfo.address, { size: 32 });
-      }
-
+      // Resolve recipient bytes32 (EVM 20-byte address zero-padded on left)
+      const destinationAddressBytes32 = pad(accountInfo.address, { size: 32 });
       const destinationCallerBytes32 = pad('0x', { size: 32 });
 
-      // Calculate maxFee for CCTP v2: includes forwarding fee buffer when forwarding service is active
-      const baseCctpFee = amountInUnits / BigInt(100) > BigInt(1000) ? amountInUnits / BigInt(100) : BigInt(1000);
-      const maxFee = isForwarding
-        ? (baseCctpFee * BigInt(15) / BigInt(10)) + BigInt(50000)
-        : baseCctpFee;
+      // Fetch accurate dynamic fee quote
+      const quote = await getRouteFeeQuote(fromChain.id, toChain.id, amount, speedMode);
+      const maxFee = quote.maxFeeUnits;
 
       // ==========================================
       // STEP 1: APPROVE SPEND
@@ -781,56 +393,34 @@ export function useBridge() {
       try {
         const currentAllowance = await readContract(config, {
           address: fromChain.usdcAddress as `0x${string}`,
-          abi: [
-            {
-              name: 'allowance',
-              type: 'function',
-              stateMutability: 'view',
-              inputs: [
-                { name: 'owner', type: 'address' },
-                { name: 'spender', type: 'address' }
-              ],
-              outputs: [{ type: 'uint256' }],
-            },
-          ],
+          abi: ERC20_ABI,
           functionName: 'allowance',
           args: [accountInfo.address as `0x${string}`, tokenMessenger as `0x${string}`],
+          chainId: fromChain.id as any,
         });
         if (typeof currentAllowance === 'bigint' && currentAllowance >= amountInUnits) {
           needsApproval = false;
         }
       } catch (err) {
-        console.warn("Failed to fetch current allowance, proceeding with approval:", err);
+        console.warn("Allowance query failed, proceeding with approve:", err);
       }
 
       let approveHash = '';
-
-      let currentGasPrice: bigint = BigInt(1500000000);
-      try {
-        currentGasPrice = await getGasPrice(config, { chainId: fromChain.id as any });
-      } catch (err) {
-        console.warn("Failed to fetch gas price, using fallback:", err);
-      }
-
-      const isOpStack = [11155420, 1301, 763373].includes(fromChain.id);
-
       if (needsApproval) {
         approveHash = await writeContract(config, {
           address: fromChain.usdcAddress as `0x${string}`,
           abi: ERC20_ABI,
           functionName: 'approve',
-          args: [tokenMessenger as `0x${string}`, amountInUnits + maxFee],
+          args: [tokenMessenger as `0x${string}`, amountInUnits],
           chainId: fromChain.id as any,
-          ...(isOpStack ? {
-            gas: BigInt(180000),
-            gasPrice: currentGasPrice,
-            type: 'legacy'
-          } : {})
         });
 
-        const approveReceipt = await waitForTransactionReceipt(config, { hash: approveHash as `0x${string}` });
+        const approveReceipt = await waitForTransactionReceipt(config, {
+          hash: approveHash as `0x${string}`,
+          chainId: fromChain.id as any,
+        });
         if (approveReceipt.status === 'reverted') {
-          throw new Error('Approval transaction reverted on-chain. Check that you have enough gas.');
+          throw new Error('Approval transaction reverted on-chain.');
         }
       }
 
@@ -841,19 +431,13 @@ export function useBridge() {
         explorerUrl: approveHash ? `${fromChain.explorerUrl}/tx/${approveHash}` : undefined
       } : s));
 
-      window.dispatchEvent(new CustomEvent('bridge-step-change', { detail: { step: 'burn' } }));
-
       // ==========================================
-      // STEP 2: BURN (Branching: Forwarding vs Manual)
+      // STEP 2: BURN (Immediate Persistence Before Receipt)
       // ==========================================
       setSteps(prev => prev.map(s => s.name === 'burn' ? { ...s, status: 'active' } : s));
 
-      let burnHash = '';
-      try {
-        let txHash: `0x${string}`;
-
-        // Always use depositForBurnWithHook — Circle CCTP Forwarding Service auto-relay
-        console.log(`Executing CCTP depositForBurnWithHook to ${toChain.name} (Domain ${toDomain})`);
+      let txHash: `0x${string}`;
+      if (isForwarding) {
         txHash = await writeContract(config, {
           address: tokenMessenger as `0x${string}`,
           abi: TOKEN_MESSENGER_ABI,
@@ -869,48 +453,61 @@ export function useBridge() {
             CCTP_FORWARD_HOOK_DATA
           ],
           chainId: fromChain.id as any,
-          ...(isOpStack ? {
-            gas: BigInt(400000),
-            gasPrice: currentGasPrice,
-            type: 'legacy'
-          } : {})
         });
-
-        const burnReceipt = await waitForTransactionReceipt(config, { hash: txHash });
-        if (burnReceipt.status === 'reverted') {
-          throw new Error('Burn transaction reverted on-chain.');
-        }
-        burnHash = txHash;
-      } catch (burnErr) {
-        console.error('CCTP burn failed:', burnErr);
-        throw burnErr;
+      } else {
+        txHash = await writeContract(config, {
+          address: tokenMessenger as `0x${string}`,
+          abi: TOKEN_MESSENGER_ABI,
+          functionName: 'depositForBurn',
+          args: [
+            amountInUnits,
+            toDomain,
+            destinationAddressBytes32,
+            fromChain.usdcAddress as `0x${string}`,
+            destinationCallerBytes32,
+            maxFee,
+            speedMode === 'fast' ? 1000 : 2000
+          ],
+          chainId: fromChain.id as any,
+        });
       }
 
-      activeBurnHash = burnHash;
-      setSourceTxHash(burnHash);
+      // CRITICAL: Persist burn transaction hash IMMEDIATELY after submission
+      activeBurnHash = txHash;
+      setSourceTxHash(txHash);
 
       addTransaction({
-        id: burnHash,
+        id: txHash,
         userAddress: accountInfo.address,
         fromChainId: fromChain.id,
         toChainId: toChain.id,
         amount,
         status: 'pending',
-        burnTxHash: burnHash
+        burnTxHash: txHash,
+        isRelayed: isForwarding,
       });
+
+      // Now await on-chain inclusion
+      const burnReceipt = await waitForTransactionReceipt(config, {
+        hash: txHash,
+        chainId: fromChain.id as any,
+      });
+      if (burnReceipt.status === 'reverted') {
+        updateTransaction(txHash, { status: 'failed' });
+        throw new Error('Burn transaction reverted on-chain.');
+      }
+
+      burnConfirmedOnChain = true;
 
       setSteps(prev => prev.map(s => s.name === 'burn' ? {
         ...s,
         status: 'done',
-        txHash: burnHash.substring(0, 10) + '...',
-        explorerUrl: `${fromChain.explorerUrl}/tx/${burnHash}`
+        txHash: txHash.substring(0, 10) + '...',
+        explorerUrl: `${fromChain.explorerUrl}/tx/${txHash}`
       } : s));
 
-      window.dispatchEvent(new Event('bridge-success-refresh'));
-      window.dispatchEvent(new CustomEvent('bridge-step-change', { detail: { step: 'attest' } }));
-
       // ==========================================
-      // STEP 3: ATTESTATION & AUTO-FORWARD / MINT
+      // STEP 3: CIRCLE ATTESTATION
       // ==========================================
       setSteps(prev => prev.map(s => s.name === 'attest' ? { ...s, status: 'active' } : s));
 
@@ -918,51 +515,157 @@ export function useBridge() {
         setAttestationElapsed(prev => prev + 1);
       }, 1000);
 
-      const attestationMessage = await retrieveAttestation(burnHash, fromDomain);
+      const attestationMessage = await retrieveAttestation(txHash, fromDomain, toDomain);
       if (attestTimerRef.current) clearInterval(attestTimerRef.current);
 
-      // FORWARDING COMPLETE — Circle auto-relays attestation & mints on destination
+      let decodedNonce: `0x${string}` | undefined = undefined;
+      try {
+        const decoded = decodeMessageV2(attestationMessage.message);
+        decodedNonce = decoded.nonce;
+      } catch (err) {
+        console.warn('Could not decode nonce from message bytes:', err);
+      }
+
       setSteps(prev => prev.map(s => s.name === 'attest' ? {
         ...s,
         status: 'done',
-        label: 'Circle Auto-Relayed ⚡',
-        description: 'Circle forwarded attestation & minted USDC on destination automatically',
-        txHash: 'Auto-Relayed',
-        explorerUrl: `https://iris-api-sandbox.circle.com/v2/messages/${fromDomain}?transactionHash=${burnHash}`
+        label: 'Attestation Verified',
+        description: 'Circle signed the CCTP attestation successfully',
+        explorerUrl: `${getIrisApiBaseUrl()}/v2/messages/${fromDomain}?transactionHash=${txHash}`
       } : s));
 
-      updateTransaction(burnHash, {
-        status: 'success',
-        mintTxHash: 'auto-relayed'
-      });
-      setStatus('success');
-      window.dispatchEvent(new CustomEvent('bridge-step-change', { detail: { step: 'success' } }));
-      window.dispatchEvent(new CustomEvent('bridge-state-change', { detail: { isBridging: false } }));
+      // ==========================================
+      // STEP 4: DESTINATION EXECUTION VERIFICATION
+      // ==========================================
+      setSteps(prev => prev.map(s => s.name === 'relay' ? { ...s, status: 'active' } : s));
+
+      if (isForwarding) {
+        // Auto-forwarding route: poll destination chain usedNonces to verify settlement
+        let isDelivered = false;
+        if (decodedNonce) {
+          const destClient = getPublicClientForChain(toChain.id);
+          for (let poll = 0; poll < 35; poll++) {
+            try {
+              const used = await destClient.readContract({
+                address: destinationTransmitter as `0x${string}`,
+                abi: MESSAGE_TRANSMITTER_ABI,
+                functionName: 'usedNonces',
+                args: [decodedNonce],
+              });
+              if (used > 0n) {
+                isDelivered = true;
+                break;
+              }
+            } catch (err) {
+              console.warn('Destination readContract usedNonces poll failed:', err);
+            }
+            await new Promise(r => setTimeout(r, 4000));
+          }
+        }
+
+        if (isDelivered) {
+          setSteps(prev => prev.map(s => s.name === 'relay' ? {
+            ...s,
+            status: 'done',
+            label: 'Delivered (Auto-Relayed)',
+            description: `USDC minted on ${toChain.name} and confirmed on-chain`,
+          } : s));
+
+          updateTransaction(txHash, {
+            status: 'success',
+            mintTxHash: 'verified_onchain',
+          });
+          setDestTxHash('verified_onchain');
+          setStatus('success');
+        } else {
+          // Relayer is taking longer than usual; keep recoverable without marking failed
+          setSteps(prev => prev.map(s => s.name === 'relay' ? {
+            ...s,
+            status: 'active',
+            label: 'Relaying in Progress',
+            description: 'Attestation confirmed. Circle relayer submission pending on destination.',
+          } : s));
+
+          updateTransaction(txHash, {
+            status: 'pending',
+          });
+          setStatus('success'); // Transfer is confirmed on-chain, settlement will complete
+        }
+      } else {
+        // Manual mint route: user executes receiveMessage
+        setSteps(prev => prev.map(s => s.name === 'relay' ? {
+          ...s,
+          status: 'active',
+          label: 'Ready to Claim',
+          description: `Attestation complete. Submit mint transaction on ${toChain.name}.`,
+        } : s));
+
+        // Switch to destination chain to execute receiveMessage
+        await switchChain(config, { chainId: toChain.id as any });
+
+        const mintHash = await writeContract(config, {
+          address: destinationTransmitter as `0x${string}`,
+          abi: MESSAGE_TRANSMITTER_ABI,
+          functionName: 'receiveMessage',
+          args: [
+            attestationMessage.message as `0x${string}`,
+            attestationMessage.attestation as `0x${string}`
+          ],
+          chainId: toChain.id as any,
+        });
+
+        const mintReceipt = await waitForTransactionReceipt(config, {
+          hash: mintHash,
+          chainId: toChain.id as any,
+        });
+
+        if (mintReceipt.status === 'reverted') {
+          throw new Error('Destination mint transaction reverted.');
+        }
+
+        setSteps(prev => prev.map(s => s.name === 'relay' ? {
+          ...s,
+          status: 'done',
+          label: 'Mint Confirmed',
+          txHash: mintHash.substring(0, 10) + '...',
+          explorerUrl: `${toChain.explorerUrl}/tx/${mintHash}`
+        } : s));
+
+        updateTransaction(txHash, {
+          status: 'success',
+          mintTxHash: mintHash,
+        });
+        setDestTxHash(mintHash);
+        setStatus('success');
+      }
+
+      window.dispatchEvent(new Event('bridge-success-refresh'));
     } catch (err: any) {
-      console.error('CCTP Bridge transaction failed:', err);
-      if (activeBurnHash) {
+      console.error('CCTP Bridge error:', err);
+
+      // Only mark failed if burn did NOT confirm on chain
+      if (activeBurnHash && !burnConfirmedOnChain) {
         updateTransaction(activeBurnHash, { status: 'failed' });
       }
+
       setStatus('error');
       const rawMsg: string = err?.message || '';
-      let friendlyError = 'Transaction was rejected or failed on chain.';
+      let friendlyError = 'Transaction failed or was rejected.';
+
       if (rawMsg.includes('User rejected') || rawMsg.includes('user rejected')) {
-        friendlyError = 'Transaction rejected in wallet. Please try again.';
+        friendlyError = 'Transaction rejected in wallet.';
       } else if (rawMsg.includes('insufficient funds')) {
-        friendlyError = 'Insufficient funds for gas. Get testnet ETH from the Faucet.';
-      } else if (rawMsg.includes('execution reverted')) {
-        const revertMatch = rawMsg.match(/reason: (.+?)(?:\n|$)/);
-        friendlyError = revertMatch
-          ? `Contract reverted: ${revertMatch[1]}`
-          : 'Contract execution reverted. Check USDC balance and approval.';
+        friendlyError = fromChain.isNativeArc
+          ? 'Insufficient USDC for gas. Arc uses native USDC (18 decimals) for gas.'
+          : 'Insufficient native currency for network gas.';
+      } else if (rawMsg.includes('AttestationTimeoutError')) {
+        friendlyError = 'Attestation is taking longer than usual. Your funds are safe and recoverable by burn hash.';
       } else if (rawMsg.length > 0) {
         friendlyError = rawMsg.substring(0, 180);
       }
+
       setError(friendlyError);
-      setSteps(prev => prev.map(s => s.status === 'active' || s.status === 'pending' ? { ...s, status: 'error' } : s));
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('bridge-state-change', { detail: { isBridging: false } }));
-      }
+      setSteps(prev => prev.map(s => s.status === 'active' ? { ...s, status: 'error' } : s));
     } finally {
       if (timerRef.current) clearInterval(timerRef.current);
       if (attestTimerRef.current) clearInterval(attestTimerRef.current);
