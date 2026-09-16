@@ -11,7 +11,11 @@
 ## 1. Safety Principles & Pre-Conditions
 
 1. **Explicit Authorization Required:** Never initiate a mainnet transaction with real user funds without human sign-off on the active canary wallet.
-2. **Strict Value Cap:** The initial live canary transfer must not exceed **1.00 USDC** (minimum bridge amount is 0.05 USDC).
+2. **Route-Specific Value Caps & Canary Budgets:**
+   - **Base -> Arc Mainnet:** Principal `1.00 USDC`, Forwarding Relayer Fee `~0.02 USDC`, Source Gas `~0.0002 ETH (~$0.50)`. Total needed: ~1.05 USDC + 0.0005 ETH.
+   - **Arbitrum -> Arc Mainnet:** Principal `1.00 USDC`, Forwarding Relayer Fee `~0.02 USDC`, Source Gas `~0.0001 ETH (~$0.25)`. Total needed: ~1.05 USDC + 0.0003 ETH.
+   - **Arc Mainnet -> Base/Arbitrum:** Principal `1.00 USDC`, Forwarding Relayer Fee `~0.02 USDC`, Source Gas `~0.005 USDC`. Total needed: ~1.05 USDC native Arc.
+   - **Arc Mainnet -> Ethereum L1:** **CRITICAL:** Do NOT attempt <= 1.00 USDC! Ethereum destination mint forwarding fee is `~1.01 - 1.31 USDC`. Recommended Canary Principal: `5.00 - 10.00 USDC`, Forwarding Relayer Fee `~1.25 USDC`, Source Gas `~0.005 USDC`. Total needed: ~12.00 USDC on Arc.
 3. **No Unaudited Swaps:** Bridgr on mainnet is dedicated exclusively to native USDC cross-chain bridging via CCTP v2. Token swaps and simulated testnet escrows are strictly disabled.
 4. **Isolated Storage:** Ensure your browser is using `bridgr-tx-history-mainnet`. Any legacy testnet records are segregated in `bridgr-tx-history-testnet`.
 
@@ -30,8 +34,9 @@ Before initiating any canary transaction:
   ```
 - [ ] **Source Chain Gas:** The canary wallet has sufficient native gas currency:
   - On Base: at least 0.0005 ETH (~$1.50)
-  - On Arc (for Arc -> EVM canary): at least 0.005 native USDC gas
-- [ ] **USDC Balance:** The canary wallet holds at least 1.05 USDC on the source network.
+  - On Arbitrum: at least 0.0003 ETH (~$0.90)
+  - On Arc (for Arc -> EVM canary): at least 0.01 native USDC gas
+- [ ] **USDC Balance:** The canary wallet holds the required principal + forwarding buffer for the target route.
 - [ ] **Circle Iris API Health:** Verify the production Iris API endpoint is reachable:
   ```bash
   curl -s -I https://iris-api.circle.com/v2/messages/6?transactionHash=0x0
@@ -53,9 +58,10 @@ Before initiating any canary transaction:
 3. Enter Amount: `1.00` USDC.
 4. Speed Mode: Select **Standard** (free protocol fee) or **Fast** (~10 bps fee).
 5. Inspect the **Fee Breakdown Panel**:
-   - Source Gas: `~$0.01`
-   - Destination Gas: `$0.00 (Auto-Minted)`
-   - You Receive: `1.0000 USDC` (Standard) or `0.9990 USDC` (Fast)
+   - Source Gas: `~$0.01 ETH`
+   - Circle Protocol Fee: `$0.00` (Standard) or `~$0.01` (Fast)
+   - Circle Forwarding Fee: `~$0.02 USDC`
+   - Net Received: `~0.98 USDC` (Standard) or `~0.97 USDC` (Fast)
 
 ### Step 3: Approval Confirmation
 1. Click **BRIDGE USDC**.
