@@ -21,6 +21,7 @@ export interface BridgeTransaction {
   isRelayed?: boolean;
   environment?: 'mainnet' | 'testnet';
   errorReason?: string;
+  verificationStatus?: 'pending_reconciliation' | 'verified_onchain' | 'failed' | 'indexing_pending';
 }
 
 function getStorageKey(): string {

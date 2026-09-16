@@ -11,17 +11,22 @@ export interface RouteQuote {
   destDomain: number;
   sendAmount: string;           // E.g. "100.00"
   sendAmountUnits: bigint;      // E.g. 100000000n (6 decimals)
-  protocolFeeUnits: bigint;     // Protocol fee deducted from transfer
-  protocolFeeFormatted: string; // E.g. "0.00" or "0.05"
-  maxFeeUnits: bigint;          // Fee cap sent to depositForBurn
+  protocolFeeUnits: bigint;     // Circle fast transfer protocol fee (0 for standard)
+  protocolFeeFormatted: string; // E.g. "0.00" or "0.325"
+  forwardingFeeUnits: bigint;   // Circle forwarding service fee for destination minting
+  forwardingFeeFormatted: string;// E.g. "0.02" or "1.014"
+  totalFeeUnits: bigint;        // protocolFeeUnits + forwardingFeeUnits
+  totalFeeFormatted: string;    // Sum of all fees deducted from transfer
+  maxFeeUnits: bigint;          // Fee cap sent to depositForBurnWithHook (totalFee + safety buffer)
   maxFeeFormatted: string;
-  expectedReceiveAmount: string;// E.g. "99.95"
+  expectedReceiveAmount: string;// E.g. "99.95" (sendAmount - totalFee)
   expectedReceiveUnits: bigint;
   speedMode: 'standard' | 'fast';
+  isForwarding: boolean;
   estimatedDuration: string;
-  sourceGasEstimateUnits?: bigint; // On Arc: reserved in USDC; on EVM: in ETH
+  sourceGasEstimateUnits?: bigint; // On Arc: reserved in native USDC; on EVM: in ETH
   isArcSource: boolean;
-  expiresAt: number;            // Timestamp after which quote must refresh
+  expiresAt: number;            // Timestamp after which quote must refresh (60s)
 }
 
 /**
@@ -96,12 +101,14 @@ export function formatUsdcUnits(units: bigint, displayDecimals = 2): string {
 
 /**
  * Fetches dynamic route fee quote from Circle Iris API or computes documented fallback.
+ * Covers both Circle protocol fees (fast transfers) and forwarding service fees (destination minting).
  */
 export async function getRouteFeeQuote(
   sourceChainId: number,
   destChainId: number,
   amount: string,
   speedMode: 'standard' | 'fast' = 'standard',
+  isForwarding = true,
   env?: NetworkEnvironment
 ): Promise<RouteQuote> {
   const activeEnv = env || getActiveEnvironment();
@@ -119,64 +126,86 @@ export async function getRouteFeeQuote(
 
   const sendAmountUnits = parseUsdcUnits(amountValidation.cleanValue!);
   const baseUrl = getIrisApiBaseUrl(activeEnv);
+  const forwardingActive = isForwarding && dstConfig.supportsForwardingDest;
 
-  let feeBps = 0; // Standard transfer protocol fee is 0
-  let minFeeUnits = 0n;
+  let protocolFeeUnits = 0n;
+  let forwardingFeeUnits = 0n;
 
-  if (speedMode === 'fast' && srcConfig.supportsFastTransferSource) {
-    // Attempt to query live fee endpoint from Circle Iris API
-    try {
-      const response = await fetch(
-        `${baseUrl}/v2/burn/USDC/fees/${srcConfig.domain}/${dstConfig.domain}`,
-        {
-          method: 'GET',
-          headers: { 'Accept': 'application/json' },
-          signal: AbortSignal.timeout(4000),
+  try {
+    const url = `${baseUrl}/v2/burn/USDC/fees/${srcConfig.domain}/${dstConfig.domain}?forward=${forwardingActive}`;
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
+      signal: AbortSignal.timeout(4000),
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      const tiers: Array<{
+        finalityThreshold: number;
+        minimumFee?: number;
+        forwardFee?: { low?: number; med?: number; high?: number };
+      }> = Array.isArray(data) ? data : data?.fees || [];
+
+      // Match target threshold: 1000 for fast, 2000 for standard
+      const targetThreshold = speedMode === 'fast' && srcConfig.supportsFastTransferSource ? 1000 : 2000;
+      const matchedTier = tiers.find(t => t.finalityThreshold === targetThreshold) || tiers[0];
+
+      if (matchedTier) {
+        // 1. Protocol Fee (Fast transfer)
+        if (targetThreshold === 1000 && typeof matchedTier.minimumFee === 'number' && matchedTier.minimumFee > 0) {
+          protocolFeeUnits = parseUsdcUnits(matchedTier.minimumFee.toString());
         }
-      );
 
-      if (response.ok) {
-        const data = await response.json();
-        // Circle fee endpoint returns basis points or rate
-        if (typeof data.fastTransferFeeBps === 'number') {
-          feeBps = data.fastTransferFeeBps;
-        } else if (typeof data.feeBps === 'number') {
-          feeBps = data.feeBps;
-        }
-        if (data.minFee) {
-          minFeeUnits = BigInt(data.minFee);
+        // 2. Forwarding Fee (Relayer destination mint)
+        if (forwardingActive && matchedTier.forwardFee) {
+          const medFee = matchedTier.forwardFee.med ?? matchedTier.forwardFee.high ?? matchedTier.forwardFee.low ?? 0;
+          forwardingFeeUnits = BigInt(Math.round(medFee));
         }
       }
-    } catch {
-      // Use standard documented fast transfer fee: ~10 bps (0.10%)
-      feeBps = 10;
-      minFeeUnits = BigInt(10_000); // 0.01 USDC
+    } else {
+      throw new Error(`Iris fee query HTTP ${response.status}`);
+    }
+  } catch (err) {
+    // Documented fallback based on destination gas dynamics
+    console.warn('Iris fee endpoint query failed, using documented route estimates:', err);
+
+    // Fast protocol fee fallback (~10 bps with 0.01 USDC min if source supports fast)
+    if (speedMode === 'fast' && srcConfig.supportsFastTransferSource) {
+      const bpsFee = (sendAmountUnits * 10n) / 10_000n;
+      protocolFeeUnits = bpsFee < 10_000n ? 10_000n : bpsFee;
+    }
+
+    // Forwarding fee fallback
+    if (forwardingActive) {
+      // Ethereum L1 destination mint costs significantly more gas (~1.25 USDC)
+      if (dstConfig.id === 1 || dstConfig.id === 11155111) {
+        forwardingFeeUnits = 1_250_000n; // 1.25 USDC
+      } else {
+        // Arc and EVM L2s (Base, Arbitrum)
+        forwardingFeeUnits = 25_000n; // 0.025 USDC
+      }
     }
   }
 
-  // Calculate protocol fee units
-  let protocolFeeUnits = 0n;
-  if (feeBps > 0) {
-    protocolFeeUnits = (sendAmountUnits * BigInt(feeBps)) / BigInt(10_000);
-    if (protocolFeeUnits < minFeeUnits) {
-      protocolFeeUnits = minFeeUnits;
-    }
+  // Total fee deducted from the bridge principal
+  const totalFeeUnits = protocolFeeUnits + forwardingFeeUnits;
+
+  if (sendAmountUnits <= totalFeeUnits) {
+    throw new Error(
+      `Amount must be greater than required total route fees of ${formatUsdcUnits(totalFeeUnits, 4)} USDC ` +
+      `(${formatUsdcUnits(protocolFeeUnits, 4)} protocol + ${formatUsdcUnits(forwardingFeeUnits, 4)} forwarding).`
+    );
   }
 
-  // maxFee: Circle recommends setting maxFee slightly above expected fee (e.g. +10% or minimum 0.001 USDC buffer)
-  // to avoid revert if rate changes slightly before inclusion.
-  let maxFeeUnits = protocolFeeUnits;
-  if (speedMode === 'fast' && protocolFeeUnits > 0n) {
-    maxFeeUnits = protocolFeeUnits + (protocolFeeUnits / 10n) + BigInt(1_000);
-  } else if (speedMode === 'standard') {
-    maxFeeUnits = 0n; // Standard transfer requires maxFee = 0
+  // maxFee cap passed to depositForBurnWithHook
+  // Circle recommends total fee + ~10% safety cushion (min +0.005 USDC) to prevent reverts on inclusion
+  let maxFeeUnits = 0n;
+  if (forwardingActive || protocolFeeUnits > 0n) {
+    maxFeeUnits = totalFeeUnits + (totalFeeUnits / 10n) + 5_000n;
   }
 
-  if (sendAmountUnits <= protocolFeeUnits) {
-    throw new Error(`Amount must be greater than required fee of ${formatUsdcUnits(protocolFeeUnits, 4)} USDC.`);
-  }
-
-  const expectedReceiveUnits = sendAmountUnits - protocolFeeUnits;
+  const expectedReceiveUnits = sendAmountUnits - totalFeeUnits;
 
   // Finality estimation
   let estimatedDuration = '~2-5 minutes';
@@ -195,11 +224,16 @@ export async function getRouteFeeQuote(
     sendAmountUnits,
     protocolFeeUnits,
     protocolFeeFormatted: formatUsdcUnits(protocolFeeUnits, 4),
+    forwardingFeeUnits,
+    forwardingFeeFormatted: formatUsdcUnits(forwardingFeeUnits, 4),
+    totalFeeUnits,
+    totalFeeFormatted: formatUsdcUnits(totalFeeUnits, 4),
     maxFeeUnits,
     maxFeeFormatted: formatUsdcUnits(maxFeeUnits, 4),
     expectedReceiveAmount: formatUsdcUnits(expectedReceiveUnits, 4),
     expectedReceiveUnits,
     speedMode,
+    isForwarding: forwardingActive,
     estimatedDuration,
     isArcSource: srcConfig.isNativeArc,
     expiresAt: Date.now() + 60_000, // 1 minute quote validity

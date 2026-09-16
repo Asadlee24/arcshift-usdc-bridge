@@ -32,22 +32,40 @@ CREATE POLICY "Public read access for bridge transactions"
     FOR SELECT
     USING (true);
 
--- 2. Insert Policy: Allow client apps to insert new pending bridge transaction records
-CREATE POLICY "Public insert access for new bridge records"
+-- 2. Insert Policy: Anonymous clients can only insert unverified 'pending_reconciliation' records
+-- Client-submitted records are strictly treated as unverified hints until reconciled on-chain.
+CREATE POLICY "Anon insert access for pending bridge records"
     ON public.bridge_transactions
     FOR INSERT
+    TO anon, authenticated
     WITH CHECK (
         length(id) > 10
         AND length(user_address) >= 32
         AND length(amount) <= 32
-        AND verification_status IN ('pending_reconciliation', 'verified_onchain')
+        AND status = 'pending'
+        AND verification_status = 'pending_reconciliation'
     );
 
--- 3. Update Policy: Allow updating transaction status and destination mint hash
-CREATE POLICY "Public update access for transaction finalization"
+-- 3. Update Policy: Anonymous clients cannot overwrite verified financial records or self-certify
+-- Clients may submit client-observed transaction hashes, but verification_status remains protected.
+CREATE POLICY "Anon update access restricted to unverified records"
     ON public.bridge_transactions
     FOR UPDATE
-    USING (true)
+    TO anon, authenticated
+    USING (
+        -- Only permit client updates on records that have NOT yet been authoritatively verified
+        verification_status = 'pending_reconciliation'
+    )
     WITH CHECK (
         length(id) > 10
+        -- Anonymous clients are strictly forbidden from setting verification_status to 'verified_onchain'
+        AND verification_status = 'pending_reconciliation'
     );
+
+-- 4. Service Role Policy: Only backend indexer / reconciler using service_role can verify records
+CREATE POLICY "Service role full reconciliation access"
+    ON public.bridge_transactions
+    FOR ALL
+    TO service_role
+    USING (true)
+    WITH CHECK (true);

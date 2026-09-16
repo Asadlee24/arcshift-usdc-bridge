@@ -200,24 +200,33 @@ export default function FeeBreakdownPanel({
 
               <div className={`flex items-center justify-between text-[11px] font-semibold ${textMuted}`}>
                 <span>Source Gas Fee</span>
-                <span className={textPrimary}>{srcGas}</span>
+                <span className={textPrimary}>{srcGas} ({fromChain?.nativeCurrency?.symbol || 'Gas'})</span>
               </div>
 
               <div className={`flex items-center justify-between text-[11px] font-semibold ${textMuted}`}>
-                <span>Destination Gas Fee</span>
-                <span className="text-emerald-500 font-bold">{dstGas}</span>
-              </div>
-
-              <div className={`flex items-center justify-between text-[11px] font-semibold ${textMuted}`}>
-                <span>{speedMode === 'fast' ? 'Circle Fast Transfer Fee' : 'Circle Protocol Fee'}</span>
+                <span>Circle Protocol Fee ({speedMode === 'fast' ? 'Fast' : 'Standard'})</span>
                 <span className={textPrimary}>{protocolFeeDisplay}</span>
               </div>
+
+              <div className={`flex items-center justify-between text-[11px] font-semibold ${textMuted}`}>
+                <span>Circle Forwarding Relayer Fee</span>
+                <span className={isForwarding ? textPrimary : textMuted}>
+                  {quote?.forwardingFeeFormatted ? `~$${quote.forwardingFeeFormatted} USDC` : isForwarding ? '~$0.02 USDC' : 'None (Manual Claim)'}
+                </span>
+              </div>
+
+              {quote && quote.maxFeeUnits > 0n && (
+                <div className={`flex items-center justify-between text-[10px] font-medium ${textMuted}`}>
+                  <span>Maximum Fee Budget (maxFee)</span>
+                  <span className="font-mono">{quote.maxFeeFormatted} USDC</span>
+                </div>
+              )}
 
               <div className={`border-t ${dividerColor} my-0.5`} />
 
               <div className="flex items-center justify-between text-[12px] font-black">
                 <span className={textMuted}>You Receive</span>
-                <span className="text-[#C8922A]">{receivedDisplay}</span>
+                <span className="text-[#C8922A] font-mono">{receivedDisplay}</span>
               </div>
 
               <div className={`rounded-xl p-2.5 text-[10px] font-medium leading-relaxed flex items-start gap-2 ${
@@ -225,7 +234,7 @@ export default function FeeBreakdownPanel({
               }`}>
                 <ShieldCheck className="h-3.5 w-3.5 flex-shrink-0 mt-0.5 text-amber-500" />
                 <span>
-                  <strong>Circle CCTP v2 Direct Mint:</strong> Single-signature burn on source network. Native USDC is minted directly to your destination wallet by Circle's MessageTransmitter without wrapped token or liquidity pool risk.
+                  <strong>Circle CCTP v2 Settlement:</strong> Senders sign once on source. Protocol and forwarding fees are deducted from the cross-chain transfer according to Circle Iris route quotes. No wrapped tokens or pool slippage.
                 </span>
               </div>
 

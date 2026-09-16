@@ -27,6 +27,11 @@ export interface ChainMetadata {
   isSolana?: boolean;
   supportsForwarding: boolean;
   supportsFastTransfer?: boolean;
+  nativeCurrency?: {
+    name: string;
+    symbol: string;
+    decimals: number;
+  };
 }
 
 function configToMetadata(c: ChainConfig): ChainMetadata {
@@ -46,6 +51,7 @@ function configToMetadata(c: ChainConfig): ChainMetadata {
     isSolana: c.isSolana || false,
     supportsForwarding: c.supportsForwardingDest,
     supportsFastTransfer: c.supportsFastTransferSource,
+    nativeCurrency: c.nativeCurrency,
   };
 }
 

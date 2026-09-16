@@ -153,12 +153,19 @@ export default function BridgeCard({ theme = 'light' }: BridgeCardProps) {
     setQuoteLoading(true);
 
     const timer = setTimeout(() => {
-      getRouteFeeQuote(fromChain.id, toChain.id, amount, speedMode)
+      const isForwarding = toChain.supportsForwarding !== false;
+      getRouteFeeQuote(fromChain.id, toChain.id, amount, speedMode, isForwarding)
         .then(q => {
           if (isMounted) setQuote(q);
         })
         .catch(err => {
-          if (isMounted) setQuote(null);
+          if (isMounted) {
+            setQuote(null);
+            if (err?.message && err.message.includes('Amount must be greater')) {
+              setAmountError(true);
+              setAmountErrorMsg(err.message);
+            }
+          }
         })
         .finally(() => {
           if (isMounted) setQuoteLoading(false);

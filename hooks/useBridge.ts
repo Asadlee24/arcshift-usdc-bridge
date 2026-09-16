@@ -10,7 +10,7 @@ import { config } from '../lib/wagmi';
 import { parseUnits, pad } from 'viem';
 import { addTransaction, updateTransaction } from './useTransactionHistory';
 import { getChainConfig, getIrisApiBaseUrl, getActiveEnvironment, validateRoute } from '../lib/registry';
-import { decodeMessageV2 } from '../lib/cctp/messageV2';
+import { decodeMessageV2, decodeCCTPTransfer, bytes32ToAddress, DecodedCCTPTransfer } from '../lib/cctp/messageV2';
 import { getRouteFeeQuote, parseUsdcUnits, validateAmountInput } from '../lib/bridge/quotes';
 import { getPublicClientForChain } from '../lib/publicClient';
 
@@ -146,16 +146,29 @@ export class AttestationTimeoutError extends Error {
   }
 }
 
+export interface TransferMatchCriteria {
+  expectedDestDomain: number;
+  expectedRecipient?: string;
+  expectedAmountUnits?: bigint;
+  expectedBurnToken?: string;
+}
+
+export interface VerifiedAttestationResult {
+  attestationMessage: AttestationMessage;
+  decodedTransfer: DecodedCCTPTransfer;
+}
+
 /**
  * Polls Circle's Iris API for attestation corresponding to the burn transaction.
- * Matches destination domain to ensure the correct message is retrieved if multiple exist.
+ * Strictly verifies that the complete message matches the confirmed source burn
+ * (source/dest domain, burn token, mint recipient, and amount) before accepting it.
  */
 async function retrieveAttestation(
   transactionHash: string,
   fromDomain: number,
-  expectedDestDomain?: number,
+  criteria?: TransferMatchCriteria,
   maxAttempts = 60
-): Promise<AttestationMessage> {
+): Promise<VerifiedAttestationResult> {
   const baseUrl = getIrisApiBaseUrl();
   const url = `${baseUrl}/v2/messages/${fromDomain}?transactionHash=${transactionHash}`;
 
@@ -167,20 +180,42 @@ async function retrieveAttestation(
         const data = (await response.json()) as AttestationResponse;
         const messages = data?.messages || [];
 
-        // Match expected message if destination domain is known
+        // Match expected message against source burn parameters
         for (const msg of messages) {
-          if (msg.status === 'complete') {
-            if (expectedDestDomain !== undefined && msg.message) {
-              try {
-                const decoded = decodeMessageV2(msg.message);
-                if (decoded.destinationDomain === expectedDestDomain) {
-                  return msg;
+          if (msg.status === 'complete' && msg.message) {
+            try {
+              const decoded = decodeCCTPTransfer(msg.message);
+
+              // 1. Match source domain
+              if (decoded.message.sourceDomain !== fromDomain) continue;
+
+              // 2. Match destination domain
+              if (criteria && decoded.message.destinationDomain !== criteria.expectedDestDomain) continue;
+
+              // 3. Match BurnMessage body parameters if present
+              if (criteria && decoded.burnMessage) {
+                if (criteria.expectedBurnToken) {
+                  const burnTokenAddr = bytes32ToAddress(decoded.burnMessage.burnToken).toLowerCase();
+                  if (burnTokenAddr !== criteria.expectedBurnToken.toLowerCase()) continue;
                 }
-              } catch {
-                return msg;
+
+                if (criteria.expectedRecipient) {
+                  const recipientAddr = bytes32ToAddress(decoded.burnMessage.mintRecipient).toLowerCase();
+                  if (recipientAddr !== criteria.expectedRecipient.toLowerCase()) continue;
+                }
+
+                if (criteria.expectedAmountUnits !== undefined) {
+                  if (decoded.burnMessage.amount !== criteria.expectedAmountUnits) continue;
+                }
               }
-            } else {
-              return msg;
+
+              // Message fully verified against source burn!
+              return {
+                attestationMessage: msg,
+                decodedTransfer: decoded,
+              };
+            } catch {
+              // Non-burn or unparseable format, check next message
             }
           }
         }
@@ -380,8 +415,8 @@ export function useBridge() {
       const destinationAddressBytes32 = pad(accountInfo.address, { size: 32 });
       const destinationCallerBytes32 = pad('0x', { size: 32 });
 
-      // Fetch accurate dynamic fee quote
-      const quote = await getRouteFeeQuote(fromChain.id, toChain.id, amount, speedMode);
+      // Fetch accurate dynamic fee quote including forwarding relayer fees
+      const quote = await getRouteFeeQuote(fromChain.id, toChain.id, amount, speedMode, isForwarding);
       const maxFee = quote.maxFeeUnits;
 
       // ==========================================
@@ -515,16 +550,19 @@ export function useBridge() {
         setAttestationElapsed(prev => prev + 1);
       }, 1000);
 
-      const attestationMessage = await retrieveAttestation(txHash, fromDomain, toDomain);
+      const { attestationMessage, decodedTransfer } = await retrieveAttestation(
+        txHash,
+        fromDomain,
+        {
+          expectedDestDomain: toDomain,
+          expectedRecipient: accountInfo.address,
+          expectedAmountUnits: amountInUnits,
+          expectedBurnToken: fromChain.usdcAddress
+        }
+      );
       if (attestTimerRef.current) clearInterval(attestTimerRef.current);
 
-      let decodedNonce: `0x${string}` | undefined = undefined;
-      try {
-        const decoded = decodeMessageV2(attestationMessage.message);
-        decodedNonce = decoded.nonce;
-      } catch (err) {
-        console.warn('Could not decode nonce from message bytes:', err);
-      }
+      const decodedNonce = decodedTransfer.message.nonce;
 
       setSteps(prev => prev.map(s => s.name === 'attest' ? {
         ...s,
@@ -542,6 +580,8 @@ export function useBridge() {
       if (isForwarding) {
         // Auto-forwarding route: poll destination chain usedNonces to verify settlement
         let isDelivered = false;
+        let realDestinationMintTxHash: string | null = null;
+
         if (decodedNonce) {
           const destClient = getPublicClientForChain(toChain.id);
           for (let poll = 0; poll < 35; poll++) {
@@ -554,6 +594,33 @@ export function useBridge() {
               });
               if (used > 0n) {
                 isDelivered = true;
+                // Attempt to retrieve actual destination receipt hash from MessageReceived event logs
+                try {
+                  const currentBlock = await destClient.getBlockNumber();
+                  const fromBlock = currentBlock > 2000n ? currentBlock - 2000n : 0n;
+                  const logs = await destClient.getLogs({
+                    address: destinationTransmitter as `0x${string}`,
+                    event: {
+                      type: 'event',
+                      name: 'MessageReceived',
+                      inputs: [
+                        { name: 'caller', type: 'address', indexed: true },
+                        { name: 'nonce', type: 'bytes32', indexed: true },
+                        { name: 'sourceDomain', type: 'uint32', indexed: false },
+                        { name: 'message', type: 'bytes', indexed: false }
+                      ]
+                    },
+                    args: { nonce: decodedNonce },
+                    fromBlock,
+                    toBlock: currentBlock
+                  });
+
+                  if (logs.length > 0 && logs[0].transactionHash) {
+                    realDestinationMintTxHash = logs[0].transactionHash;
+                  }
+                } catch (logErr) {
+                  console.warn('Could not index destination mint receipt hash:', logErr);
+                }
                 break;
               }
             } catch (err) {
@@ -567,15 +634,20 @@ export function useBridge() {
           setSteps(prev => prev.map(s => s.name === 'relay' ? {
             ...s,
             status: 'done',
-            label: 'Delivered (Auto-Relayed)',
-            description: `USDC minted on ${toChain.name} and confirmed on-chain`,
+            label: 'Delivered (Auto-Forwarded)',
+            description: realDestinationMintTxHash
+              ? `USDC minted on ${toChain.name} (Tx: ${realDestinationMintTxHash.substring(0, 10)}...)`
+              : `USDC minted on ${toChain.name} and verified on-chain via usedNonces (Tx indexing in progress)`,
+            txHash: realDestinationMintTxHash ? (realDestinationMintTxHash.substring(0, 10) + '...') : undefined,
+            explorerUrl: realDestinationMintTxHash ? `${toChain.explorerUrl}/tx/${realDestinationMintTxHash}` : undefined
           } : s));
 
           updateTransaction(txHash, {
             status: 'success',
-            mintTxHash: 'verified_onchain',
+            mintTxHash: realDestinationMintTxHash || undefined,
+            verificationStatus: 'verified_onchain',
           });
-          setDestTxHash('verified_onchain');
+          setDestTxHash(realDestinationMintTxHash || 'verified_onchain_indexing_pending');
           setStatus('success');
         } else {
           // Relayer is taking longer than usual; keep recoverable without marking failed

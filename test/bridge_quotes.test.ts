@@ -59,14 +59,36 @@ describe('Bridge Quotes & Validation Rules', () => {
     assert.equal(tinyMax.maxFormatted, '0.00');
   });
 
-  it('calculates standard route fee quote with zero protocol fee', async () => {
-    // Base (8453) -> Arc Mainnet (5042)
-    const quote = await getRouteFeeQuote(8453, 5042, '100', 'standard', 'mainnet');
+  it('calculates standard route fee quote with dynamic forwarding fee', async () => {
+    // Base (8453) -> Arc Mainnet (5042) with forwarding active (default)
+    const quote = await getRouteFeeQuote(8453, 5042, '100', 'standard', true, 'mainnet');
     assert.equal(quote.sendAmount, '100');
-    assert.equal(quote.protocolFeeUnits, 0n);
-    assert.equal(quote.maxFeeUnits, 0n);
-    assert.equal(quote.expectedReceiveAmount, '100.0000');
+    assert.equal(quote.protocolFeeUnits, 0n); // Zero protocol fee for standard
+    assert.ok(quote.forwardingFeeUnits > 0n);  // Forwarding fee is non-zero
+    assert.equal(quote.totalFeeUnits, quote.forwardingFeeUnits);
+    assert.ok(quote.maxFeeUnits > quote.totalFeeUnits); // Includes slippage buffer
     assert.equal(quote.sourceDomain, 6);
     assert.equal(quote.destDomain, 26);
+  });
+
+  it('calculates manual standard route fee quote with zero total fees when forwarding is disabled', async () => {
+    // Base (8453) -> Arc Mainnet (5042) without forwarding
+    const quote = await getRouteFeeQuote(8453, 5042, '100', 'standard', false, 'mainnet');
+    assert.equal(quote.sendAmount, '100');
+    assert.equal(quote.protocolFeeUnits, 0n);
+    assert.equal(quote.forwardingFeeUnits, 0n);
+    assert.equal(quote.totalFeeUnits, 0n);
+    assert.equal(quote.maxFeeUnits, 0n);
+    assert.equal(quote.expectedReceiveAmount, '100.0000');
+  });
+
+  it('calculates fast route fee quote with protocol fee and forwarding fee', async () => {
+    // Base (8453) -> Arc Mainnet (5042) fast transfer
+    const quote = await getRouteFeeQuote(8453, 5042, '100', 'fast', true, 'mainnet');
+    assert.equal(quote.sendAmount, '100');
+    assert.ok(quote.protocolFeeUnits > 0n); // Fast fee is > 0
+    assert.ok(quote.forwardingFeeUnits > 0n);
+    assert.equal(quote.totalFeeUnits, quote.protocolFeeUnits + quote.forwardingFeeUnits);
+    assert.ok(quote.maxFeeUnits > quote.totalFeeUnits);
   });
 });

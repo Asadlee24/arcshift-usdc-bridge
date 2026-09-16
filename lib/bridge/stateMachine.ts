@@ -74,16 +74,45 @@ export function canTransition(
     'RECOVERABLE_DELAY',
   ];
 
+  const preBurnStages: BridgeLifecycleStage[] = [
+    'IDLE',
+    'VALIDATING',
+    'APPROVE_PENDING',
+    'APPROVE_CONFIRMED',
+  ];
+
+  // Once burn has been submitted, the lifecycle can NEVER regress to pre-burn stages
+  // This prevents accidental re-approval or double-burning funds.
+  if (postBurnStages.includes(currentStage) && preBurnStages.includes(nextStage)) {
+    return false;
+  }
+
   if (postBurnStages.includes(currentStage) && nextStage === 'FAILED_PRE_BURN') {
     return false; // Burn already occurred on-chain! Funds must be recovered, not marked permanently lost.
   }
 
   // Pre-burn failure allowed only from pre-burn stages
   if (nextStage === 'FAILED_PRE_BURN') {
-    return ['IDLE', 'VALIDATING', 'APPROVE_PENDING', 'APPROVE_CONFIRMED'].includes(currentStage);
+    return preBurnStages.includes(currentStage);
   }
 
   return true;
+}
+
+/**
+ * Transitions bridge state safely, throwing an error if the transition violates lifecycle invariants.
+ */
+export function transitionBridgeState(
+  currentStage: BridgeLifecycleStage,
+  nextStage: BridgeLifecycleStage
+): BridgeLifecycleStage {
+  if (!canTransition(currentStage, nextStage)) {
+    if (nextStage === 'FAILED_PRE_BURN') {
+      throw new Error(`Cannot mark transfer as pre-burn failure: transfer has already progressed past burn submission (${currentStage})`);
+    }
+    throw new Error(`Illegal state transition from ${currentStage} to ${nextStage}`);
+  }
+  return nextStage;
 }
 
 /**
